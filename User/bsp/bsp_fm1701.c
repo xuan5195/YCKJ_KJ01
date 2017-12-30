@@ -735,7 +735,7 @@ u32 ReadMoney(uchar Block_Adr)
 名称: ReadRFIDMoney  
 功能: 读块内取卡内金额 纯读金额
 输入：Block_Adr:块地址，块编号 
-输出：卡内金额                                     
+输出：卡内金额 金额=ErrorMoney，读卡错误。                                    
 *********************************************************************/
 u32 ReadRFIDMoney(uchar Block_Adr)
 {
@@ -745,10 +745,31 @@ u32 ReadRFIDMoney(uchar Block_Adr)
 	status = MIF_READ(ReadMoney_Buf,Block_Adr);	//读取金额
 	if(status== FM1702_OK)
     {
-		u32Dat = u32Dat|((u32)ReadMoney_Buf[0]<<24);	//服务器通信使用
-		u32Dat = u32Dat|((u32)ReadMoney_Buf[1]<<16);	//金额1 高位
-		u32Dat = u32Dat|((u32)ReadMoney_Buf[2]<<8);		//金额2 
-		u32Dat = u32Dat|((u32)ReadMoney_Buf[3]);		//金额3							
+		if((CRC8_Table(ReadMoney_Buf,6)==ReadMoney_Buf[6])&&(ReadMoney_Buf[4]==RFID_OPENFLAG))	//CRC  、 开卡标志
+		{
+			if(ReadMoney_Buf[7]==0x01)	//反码标志
+			{
+				if((ReadMoney_Buf[0]==GetFanma(ReadMoney_Buf[8]))\
+				 &&(ReadMoney_Buf[1]==GetFanma(ReadMoney_Buf[9]))\
+				 &&(ReadMoney_Buf[2]==GetFanma(ReadMoney_Buf[10]))\
+				 &&(ReadMoney_Buf[3]==GetFanma(ReadMoney_Buf[11])) )
+				{
+					u32Dat = u32Dat|((u32)ReadMoney_Buf[0]<<24);	//服务器通信使用
+					u32Dat = u32Dat|((u32)ReadMoney_Buf[1]<<16);	//金额1 高位
+					u32Dat = u32Dat|((u32)ReadMoney_Buf[2]<<8);		//金额2 
+					u32Dat = u32Dat|((u32)ReadMoney_Buf[3]);		//金额3							
+				}
+				else	u32Dat = ErrorMoney;	//错误
+			}
+			else
+			{
+				u32Dat = u32Dat|((u32)ReadMoney_Buf[0]<<24);	//服务器通信使用
+				u32Dat = u32Dat|((u32)ReadMoney_Buf[1]<<16);	//金额1 高位
+				u32Dat = u32Dat|((u32)ReadMoney_Buf[2]<<8);		//金额2 
+				u32Dat = u32Dat|((u32)ReadMoney_Buf[3]);		//金额3							
+			}
+		}
+		else 	u32Dat = ErrorMoney;
     }
 	else    u32Dat = ErrorMoney;
 	return 	u32Dat;
@@ -767,14 +788,45 @@ u32 DecMoney(uchar Block_Adr,uchar Dec_dat)
 {
 	u8 ReadMoney_Buf[16]={0};
 	u8 status;
-	u32 uTemp=0;
+//	u32 uTemp=0;
 	u32 u32Dat=0x0;
 	status = MIF_READ(ReadMoney_Buf,Block_Adr);	//读取金额
-	uTemp = (((u32)ReadMoney_Buf[1]<<16)|((u32)ReadMoney_Buf[2]<<8)|(u32)ReadMoney_Buf[3]);
-	uTemp = uTemp - Dec_dat;
-	ReadMoney_Buf[3] = uTemp;
-	ReadMoney_Buf[2] = uTemp>>8;
-	ReadMoney_Buf[1] = uTemp>>16;
+	if(status== FM1702_OK)
+	{
+		if((CRC8_Table(ReadMoney_Buf,6)==ReadMoney_Buf[6])&&(ReadMoney_Buf[4]==RFID_OPENFLAG))	//CRC  、 开卡标志
+		{
+			if(ReadMoney_Buf[7]==0x01)	//反码标志
+			{
+				if((ReadMoney_Buf[0]==GetFanma(ReadMoney_Buf[8]))\
+				 &&(ReadMoney_Buf[1]==GetFanma(ReadMoney_Buf[9]))\
+				 &&(ReadMoney_Buf[2]==GetFanma(ReadMoney_Buf[10]))\
+				 &&(ReadMoney_Buf[3]==GetFanma(ReadMoney_Buf[11])) )
+				{
+					//u32Dat = u32Dat|((u32)ReadMoney_Buf[0]<<24);	//服务器通信使用
+					u32Dat = u32Dat|((u32)ReadMoney_Buf[1]<<16);	//金额1 高位
+					u32Dat = u32Dat|((u32)ReadMoney_Buf[2]<<8);		//金额2 
+					u32Dat = u32Dat|((u32)ReadMoney_Buf[3]);		//金额3							
+				}
+				else	return ErrorMoney;	//错误
+			}
+			else
+			{
+				//u32Dat = u32Dat|((u32)ReadMoney_Buf[0]<<24);	//服务器通信使用
+				u32Dat = u32Dat|((u32)ReadMoney_Buf[1]<<16);	//金额1 高位
+				u32Dat = u32Dat|((u32)ReadMoney_Buf[2]<<8);		//金额2 
+				u32Dat = u32Dat|((u32)ReadMoney_Buf[3]);		//金额3							
+			}
+		}
+		else 	return ErrorMoney;	//错误
+
+	}
+	
+	u32Dat = u32Dat - Dec_dat;	//减值;
+	
+	ReadMoney_Buf[1] = u32Dat>>16;	//金额1 高位
+	ReadMoney_Buf[2] = u32Dat>>8;	//金额2 
+	ReadMoney_Buf[3] = u32Dat;		//金额3	
+	
 	ReadMoney_Buf[6] = CRC8_Table(ReadMoney_Buf,6);
 	ReadMoney_Buf[7] = 0x01;	//反码标志  20171019 增加反码
 	ReadMoney_Buf[8] = GetFanma(ReadMoney_Buf[0]);	//反码 通信码
@@ -784,7 +836,7 @@ u32 DecMoney(uchar Block_Adr,uchar Dec_dat)
 	status = MIF_Write(ReadMoney_Buf,Block_Adr);
 	status = MIF_READ(ReadMoney_Buf,Block_Adr);	//20171020 增加读取金额
 	if((status== FM1702_OK)&&\
-	(uTemp == (((u32)ReadMoney_Buf[1]<<16)|((u32)ReadMoney_Buf[2]<<8)|(u32)ReadMoney_Buf[3])))
+	(u32Dat == (((u32)ReadMoney_Buf[1]<<16)|((u32)ReadMoney_Buf[2]<<8)|(u32)ReadMoney_Buf[3])))
     {	//20171020 增加减完金额后 再读出并对比
 		if((CRC8_Table(ReadMoney_Buf,6)==ReadMoney_Buf[6])&&(ReadMoney_Buf[4]==RFID_OPENFLAG))
 		{
@@ -795,8 +847,7 @@ u32 DecMoney(uchar Block_Adr,uchar Dec_dat)
 				u32Dat = u32Dat|((u32)ReadMoney_Buf[2]<<8);		//金额2 
 				u32Dat = u32Dat|((u32)ReadMoney_Buf[3]);		//金额3							
 			}
-			else if(ReadMoney_Buf[5]==0x02)		u32Dat = ErrorMoney+7;	//特殊异常 E700//复制卡
-			else 								u32Dat = ErrorMoney+5;	//用户异常 E000
+			else 	u32Dat = ErrorMoney;
 		}
 		else 	u32Dat = ErrorMoney;
     }

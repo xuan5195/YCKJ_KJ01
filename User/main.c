@@ -11,11 +11,9 @@ uint8_t gErrorDat[4]={0};	//异常代码存储
 uint8_t Logic_ADD=0;	//逻辑地址
 uint8_t Physical_ADD[4]={0x20,0x17,0x12,0x01};//物理地址
 uint8_t WaterCost=50,CostNum=29;	//WaterCost=水费 最小扣款金额  //脉冲数
-uint8_t g_count=0;
 uint8_t g_RxMessage[8]={0};	//CAN接收数据
 uint8_t g_RxMessFlag=0;		//CAN接收数据 标志
 //uint8_t OldOutFlag = 0;	//用于标记拔卡动作
-uint8_t CardInFlag = 0,OldCardInFlag = 0;	//用于标记插卡、拔卡动作
 uint8_t OutFlag=0,PowerUpFlag=0;	//放水标志,上电标志
 uint8_t g_MemoryBuf[5][10]={0};	//数据缓存，[0]=0xAA表示有插卡数据，[0]=0xBB表示有拔卡数据，[1-4]卡号；[5-7]金额；[8]卡核验码；[9]通信码
 uint8_t FlagBit = 0x00;		//通信标志位，每插入卡一次数据加1，数值达到199时，清0
@@ -26,7 +24,6 @@ uint8_t BeforeFlag = 0xAA;	//更新标志 0xAA表示未更新;
 u8 InPutCount=0;	//输入脉冲计数
 uint8_t re_RxMessage[16]={0};
 uint32_t RFID_Money=0,OldRFID_Money = 0,u32TempDat=0,RFID_MoneyTemp=0;	//卡内金额
-uint32_t RFID_Money_Dat=0;	//卡内金额
 extern unsigned char FM1702_Key[7];
 extern unsigned char UID[5];
 extern unsigned char FM1702_Buf[16];
@@ -131,15 +128,15 @@ int main(void)
 {
 	uint8_t DelayCount=0;
 	uint8_t PUSendCount = 0x00;	//上电发送随机数次数；
-//	uint8_t SendCAN_Buf[8]={0};
-//	uint8_t g_ShowBuf[8]={0};
-	uint8_t CardUnReadFlag=0;	//读卡标志，用于延时执行取卡动作
+	uint8_t CardUnReadFlag=0xAA;	//读卡标志，用于延时执行取卡动作
 	uint8_t OldeUID[5];			//卡号，OldeUID[4]为校验数据
 	uint8_t MemoryBuffer[10]={0};	//数据缓存，[0]=0xAA表示有插卡数据，[0]=0xBB表示有拔卡数据，[1-4]卡号；[5-7]金额；[8]卡核验码；[9]预留
 	uint8_t RFID_Count=0;	//卡开启水阀延时时间;3秒
 	uint8_t ErrorTemp[5]={0};
 	uint8_t UseErrFlag = 0x00;	//用户或卡异常标志,接收到服务器返回数据后才显示异常代码值 否则显示‘E000’
 	uint8_t i=0;
+	uint32_t RFID_Money_Dat=0;	//卡内金额,用于错误时使用
+	uint8_t CardInFlag = 0,OldCardInFlag = 0;	//用于标记插卡、拔卡动作
 	
 	InitBoard();			//硬件初始化
 	
@@ -218,18 +215,19 @@ int main(void)
 					{	//卡号不一致
 						if(OldCardInFlag != CardInFlag)	//刚拔卡
 						{
-							OldCardInFlag = CardInFlag;
 							MemoryBuffer[0] = 0x55;		//卡刚拔出
 							MemoryBuffer[5] = RFID_Money>>16;	//数据域5 金额1高位
 							MemoryBuffer[6] = RFID_Money>>8;	//数据域6 金额2
 							MemoryBuffer[7] = RFID_Money;		//数据域7 金额3
 							MemoryBuffer[8] = RFID_Money>>24;	//数据域8 校验
-							PutInMemoryBuf((u8 *)MemoryBuffer);
+							if((RFID_Money&0x00FFFFFF) > 0x00EA0000);	//错误异常时，不提交拔卡动作
+							else PutInMemoryBuf((u8 *)MemoryBuffer);
 							MemoryBuffer[0] = 0x00;		
+							OldCardInFlag = CardInFlag;
 						}
 						OldeUID[0]=UID[0];OldeUID[1]=UID[1];OldeUID[2]=UID[2];OldeUID[3]=UID[3];
-						CardUnReadFlag=0xAA;
-						OutFlag = 0x00;	//放水标志 0x00->停止放水
+						CardUnReadFlag=0xAA;	//标志改为未读到卡
+						OutFlag = 0x00;			//放水标志 0x00->停止放水
 						//CardFlag = 0x00;
 						RFID_Count=0; 
 						continue;
@@ -238,40 +236,38 @@ int main(void)
 					{
 						RFID_MoneyTemp = ReadMoney(FM1702_Key[6]);	//读取卡内金额 使用地址块FM1702_Key[6]
 						if(RFID_MoneyTemp != ErrorMoney)	RFID_Money = RFID_MoneyTemp;	//读卡正确
-						else				{ RFID_Money = OldRFID_Money; continue; }		//读卡错误 退出重新读卡
+						else				{ RFID_Money = OldRFID_Money; RFID_Count=0; continue; }		//读卡错误 退出重新读卡
+						OldRFID_Money = RFID_Money;				
+						CardInFlag = 0xAA;	//读卡成功					
 						BspTm1639_Show(0x00,0x00);		//关显示
 					}
 					else if(RFID_Count<6)//6*200=1200ms
-					{	//显示原卡内金额,提交插卡动作
-						RFID_MoneyTemp = ReadMoney(FM1702_Key[6]);	//读取卡内金额 使用地址块FM1702_Key[6]
-						if(RFID_MoneyTemp != ErrorMoney)	RFID_Money = RFID_MoneyTemp;	//读卡正确
-						else				{ RFID_Money = OldRFID_Money; continue; }		//读卡错误 退出重新读卡
-						OldRFID_Money = RFID_Money;				
+					{	//显示原卡内金额, 卡插入0.4秒时，提交插卡动作
 						if( (RFID_Money&0x00FFFFFF) == (ErrorMoney+7) )	//读出数据大于金额值为用户异常代码 E700
 						{	//E700不提交插卡动作
-							InPutCount = 0;	OutPut_OFF();		//关闭水阀，放水
+							InPutCount = 0;	OutPut_OFF();		//关闭水阀，停止放水
 							RFID_Count=200;		ErrorTemp[1] = 0x07;	ErrorTemp[0] = 0x00;
-							BspTm1639_ShowSNDat(0x12,(u8 *)ErrorTemp);//01.显示异常代码						
+							BspTm1639_ShowSNDat(0x12,(u8 *)ErrorTemp);//显示异常代码						
 						}
-						else if( (RFID_Money&0x00FFFFFF) >= ErrorMoney )	//读出数据大于金额值为用户异常代码 E000
+						else if( (RFID_Money&0x00FFFFFF) >= ErrorMoney )	//用户异常代码 E000
 						{
-							InPutCount = 0;	OutPut_OFF();		//关闭水阀，放水
+							InPutCount = 0;	OutPut_OFF();		//关闭水阀，停止放水
 							if(UseErrFlag==0x00)
 							{
-								ErrorTemp[0] = gErrorShow%10;	//个位
-								ErrorTemp[1] = gErrorShow/10;	//百位
-								BspTm1639_ShowSNDat(0x12,(u8 *)ErrorTemp);//01.显示异常代码
+								ErrorTemp[0] = gErrorShow%10;	ErrorTemp[1] = gErrorShow/10;	//百位，个位
+								BspTm1639_ShowSNDat(0x12,(u8 *)ErrorTemp);//显示异常代码
 							}
 							else
 							{
 								ErrorTemp[0] = ((gErrorDat[1]-0x30)<<4)|(gErrorDat[2]-0x30);	//十位，个位
 								ErrorTemp[1] = gErrorDat[0]-0x30;	//百位
-								BspTm1639_ShowSNDat(0x12,(u8 *)ErrorTemp);//01.显示异常代码
+								BspTm1639_ShowSNDat(0x12,(u8 *)ErrorTemp);//.显示异常代码
 							}
-							CardInFlag = 0xAA;						
+							CardInFlag = 0xAA;	//读卡成功	
 							if(OldCardInFlag != CardInFlag)	//刚插入
 							{
 								RFID_Money_Dat = ReadRFIDMoney(FM1702_Key[6]);	//纯读卡内金额 用于异常时返回卡金额
+								if(ErrorMoney==RFID_Money_Dat)	continue;	//读卡错误，返回退出
 								MemoryBuffer[0] = 0xAA;		//卡刚插入
 								MemoryBuffer[1] = UID[0];	//卡号0；
 								MemoryBuffer[2] = UID[1];	//卡号1；
@@ -283,12 +279,13 @@ int main(void)
 								MemoryBuffer[8] = RFID_Money_Dat>>24;	//数据域8 校验
 								PutInMemoryBuf((u8 *)MemoryBuffer);
 								MemoryBuffer[0] = 0x00;	
+								RFID_Money_Dat = 0;
 								OldCardInFlag = CardInFlag;
 							}							
 						}
-						else
+						else	//读出数据为正常金额,提交插卡动作
 						{
-							CardInFlag = 0xAA;						
+							CardInFlag = 0xAA;	//读卡成功								
 							BspTm1639_Show(0x04,RFID_Money);	//计费扣款模式
 							if(OldCardInFlag != CardInFlag)	//刚插入
 							{
@@ -309,18 +306,13 @@ int main(void)
 						
 					}
 					else if(RFID_Count<15)//15*200=3000ms
-					{	//延时放水，
-						RFID_MoneyTemp = ReadMoney(FM1702_Key[6]);	//读取卡内金额 使用地址块FM1702_Key[6]
-						if(RFID_MoneyTemp != ErrorMoney)	RFID_Money = RFID_MoneyTemp;	//读卡正确
-						else				{ RFID_Money = OldRFID_Money; continue; }		//读卡错误 退出重新读卡
-						OldRFID_Money = RFID_Money;				
+					{	//延时放水
 						if( (RFID_Money&0x00FFFFFF) > 0x00EA0000 )	//读出数据大于金额值为用户异常代码
 						{
-							InPutCount = 0;	//OutPut_OFF();		//关闭水阀，放水
+							InPutCount = 0;	OutPut_OFF();		//关闭水阀，放水
 							if(UseErrFlag==0x00)
 							{
-								ErrorTemp[0] = gErrorShow%10;	//个位
-								ErrorTemp[1] = gErrorShow/10;	//百位
+								ErrorTemp[0] = gErrorShow%10;	ErrorTemp[1] = gErrorShow/10;	//个位//百位
 								BspTm1639_ShowSNDat(0x12,(u8 *)ErrorTemp);//01.显示异常代码
 							}							
 							else
@@ -345,7 +337,6 @@ int main(void)
 						}
 						if(OldCardInFlag != CardInFlag)	
 						{
-							OldCardInFlag = CardInFlag;
 							RFID_Money_Dat = ReadRFIDMoney(FM1702_Key[6]);	//纯读卡内金额 用于异常时返回卡金额
 							MemoryBuffer[0] = 0xAA;		//卡刚插入
 							MemoryBuffer[1] = UID[0];	//卡号0；
@@ -357,8 +348,10 @@ int main(void)
 							MemoryBuffer[7] = RFID_Money_Dat;		//数据域7 金额3	
 							MemoryBuffer[8] = RFID_Money_Dat>>24;	//数据域8 校验
 							PutInMemoryBuf((u8 *)MemoryBuffer);
-							MemoryBuffer[0] = 0x00;		
+							MemoryBuffer[0] = 0x00;
+							RFID_Money_Dat = 0;							
 							OutFlag = 0xAA;	//放水标志
+							OldCardInFlag = CardInFlag;
 						}
 					}
 					else if((RFID_Count>15)&&((RFID_Money&0x00FFFFFF)>=WaterCost))	//卡内金额大于最小扣款基数
@@ -367,7 +360,7 @@ int main(void)
 						{
 							OutFlag = 0xAA;	//放水标志
 							RFID_Money = DecMoney(FM1702_Key[6],WaterCost);
-							if(ErrorMoney==RFID_Money)	continue;
+							if(ErrorMoney==RFID_Money)	{	RFID_Count=0;	continue;	}
 							if((OldRFID_Money-RFID_Money)>(WaterCost*2))	RFID_Money = OldRFID_Money;
 							else 											OldRFID_Money = RFID_Money; 
 							Beforeupdate = WaterCost;	//更新前扣费 初次扣费
@@ -440,14 +433,15 @@ int main(void)
 					CardInFlag = 0x00;
 					if(OldCardInFlag != CardInFlag)	//刚拔卡
 					{
-						OldCardInFlag = CardInFlag;
 						MemoryBuffer[0] = 0x55;		//卡刚拔出
 						MemoryBuffer[5] = RFID_Money>>16;	//数据域5 金额1高位
 						MemoryBuffer[6] = RFID_Money>>8;	//数据域6 金额2
 						MemoryBuffer[7] = RFID_Money;		//数据域7 金额3
 						MemoryBuffer[8] = RFID_Money>>24;	//数据域8 校验
-						PutInMemoryBuf((u8 *)MemoryBuffer);
+						if((RFID_Money&0x00FFFFFF) > 0x00EA0000);	//错误异常时，不提交拔卡动作
+						else PutInMemoryBuf((u8 *)MemoryBuffer);
 						MemoryBuffer[0] = 0x00;		
+						OldCardInFlag = CardInFlag;
 					}
 					OutFlag = 0x00;
 					Beforeupdate = 0x00;	BeforeFlag = 0xAA;

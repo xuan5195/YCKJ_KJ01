@@ -8,7 +8,6 @@
 
 extern uint8_t Physical_ADD[4];//物理地址
 extern uint8_t Logic_ADD;
-extern uint8_t g_count;
 extern uint8_t g_RxMessage[8];	//CAN接收数据
 extern uint8_t g_RxMessFlag;	//CAN接收数据 标志
 extern unsigned char FM1702_Key[7];
@@ -16,11 +15,7 @@ extern uint8_t WaterCost,CostNum;	//WaterCost=水费 最小扣款金额  //脉冲数
 extern uint8_t g_MemoryBuf[5][10];	//数据缓存，[0]=0xAA表示有插卡数据，[0]=0xBB表示有拔卡数据，[1-4]卡号；[5-7]金额；[8]卡核验码；[9]通信码
 extern void PutOutMemoryBuf(void);	//清第一个缓存
 extern uint8_t re_RxMessage[16];
-extern uint32_t RFID_Money,OldRFID_Money,u32TempDat,RFID_MoneyTemp;	//卡内金额
-extern uint32_t RFID_Money_Dat;	//卡内金额
 extern unsigned char UID[5];
-extern uint8_t FlagBit;		//通信标志位，每插入卡一次数据加1，数值达到199时，清0
-extern uint8_t BeforeFlag;	//更新标志 0xAA表示未更新; 
 extern uint8_t gErrorDat[4];	//异常代码存储
 
 //CAN初始化
@@ -241,10 +236,10 @@ u8 Can_Send_Msg(u8* msg,u8 len)
 	u8 mbox;
 	u16 i=0;
 	CanTxMsg TxMessage;
-	if((msg[0]==0x02)||(msg[0]==0x03)||(msg[0]==0x04)||(msg[0]==0x05)||(msg[0]==0x06)||(msg[0]==0x0A))	
-		TxMessage.StdId=0x200|msg[1];	// 标准标识符为0
-	else				
+	if((msg[0]==0xB3)||(msg[0]==0xC2))	
 		TxMessage.StdId=0x200;			// 标准标识符为0
+	else				
+		TxMessage.StdId=0x200|msg[1];	// 标准标识符为0
 	//TxMessage.StdId=0x200;			// 标准标识符为0
 	TxMessage.ExtId=0x1800F001;			// 设置扩展标示符（29位）
 	TxMessage.IDE=0;			// 不使用扩展标识符
@@ -352,22 +347,8 @@ void Package_Send(u8 _mode,u8 *Package_Dat)
     }
 	res = Can_Send_Msg(Package_SendBuf,8);//发送8个字节
 	if(res)	{printf(" F, ");}	
-	else 	{printf(" S, ");if(g_count<100)	g_count++;}	
+	else 	{printf(" S, ");}	
 }
 
-void Package0_Send(void)
-{
-	uint8_t res;
-	uint8_t Package_SendBuf[8]={0x00};//发送缓冲区
-	Package_SendBuf[0] = 0xC2;
-	Package_SendBuf[1] = Physical_ADD[0];	//物理地址
-	Package_SendBuf[2] = Physical_ADD[1];
-	Package_SendBuf[3] = Physical_ADD[2];
-	Package_SendBuf[4] = Physical_ADD[3];
-	Package_SendBuf[5] = g_count/10;	//
-	Package_SendBuf[6] = g_count%10;	//
-	res = Can_Send_Msg(Package_SendBuf,8);//发送8个字节
-	if(res)	{printf("Failed");}	
-	else 	{printf("OK    ");g_count=0;}	
-}
+
 
