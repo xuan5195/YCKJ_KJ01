@@ -16,7 +16,7 @@ extern uint8_t g_MemoryBuf[5][10];	//Êı¾İ»º´æ£¬[0]=0xAA±íÊ¾ÓĞ²å¿¨Êı¾İ£¬[0]=0xBB±
 extern void PutOutMemoryBuf(void);	//ÇåµÚÒ»¸ö»º´æ
 extern uint8_t re_RxMessage[16];
 extern unsigned char UID[5];
-extern uint8_t gErrorDat[4];	//Òì³£´úÂë´æ´¢
+extern uint8_t gErrorDat[6];	//Òì³£´úÂë´æ´¢
 
 //CAN³õÊ¼»¯
 //tsjw:ÖØĞÂÍ¬²½ÌøÔ¾Ê±¼äµ¥Ôª.·¶Î§:1~3; CAN_SJW_1tq	 CAN_SJW_2tq CAN_SJW_3tq CAN_SJW_4tq
@@ -220,6 +220,16 @@ void USB_LP_CAN1_RX0_IRQHandler(void)
 				SendCAN_Buf[0] = g_RxMessage[3];	SendCAN_Buf[1] = g_RxMessage[4];	SendCAN_Buf[2] = g_RxMessage[5];
 				Package_Send(0x12,(u8 *)SendCAN_Buf);
 			}
+			else if((g_RxMessage[1] == Logic_ADD)&&(g_RxMessage[0] == 0x13))	//·şÎñÆ÷ÏÂ·¢Òì³£Êı¾İ°ü Óë¿¨»òÓÃ»§Ïà¹Ø
+			{
+				gErrorDat[0] = g_RxMessage[2];	SendCAN_Buf[0] = g_RxMessage[2];//¿¨ºÅ1		
+				gErrorDat[1] = g_RxMessage[3];	SendCAN_Buf[1] = g_RxMessage[3];//¿¨ºÅ2				
+				gErrorDat[2] = g_RxMessage[4];	SendCAN_Buf[2] = g_RxMessage[4];//¿¨ºÅ3		
+				gErrorDat[3] = g_RxMessage[5];	SendCAN_Buf[3] = g_RxMessage[5];//¿¨ºÅ4		
+				gErrorDat[4] = g_RxMessage[6];	SendCAN_Buf[4] = g_RxMessage[6];//´íÎó´úÂë		
+				gErrorDat[5] = g_RxMessage[7];	SendCAN_Buf[5] = g_RxMessage[7];//Í¨ĞÅÂë		
+				Package_Send(0x14,(u8 *)SendCAN_Buf);
+			}
 			for(i=0;i<8;i++)	SendCAN_Buf[i] = 0x00;
 			g_RxMessFlag = 0x00;
 		}	
@@ -341,6 +351,15 @@ void Package_Send(u8 _mode,u8 *Package_Dat)
  			Package_SendBuf[3] = Package_Dat[0];	//Êı¾İ2
 			Package_SendBuf[4] = Package_Dat[1];	//Êı¾İ3
 			Package_SendBuf[5] = Package_Dat[2];	//Êı¾İ4
+    		break;
+    	case 0x14:	//Òì³£»Ø¸´
+ 			Package_SendBuf[0] = 0x14;
+			Package_SendBuf[1] = Logic_ADD;	//Âß¼­µØÖ·
+			Package_SendBuf[2] = Package_Dat[0];	//¿¨ºÅ1
+ 			Package_SendBuf[3] = Package_Dat[1];	//¿¨ºÅ2
+			Package_SendBuf[4] = Package_Dat[2];	//¿¨ºÅ3
+			Package_SendBuf[5] = Package_Dat[3];	//¿¨ºÅ4
+			Package_SendBuf[6] = Package_Dat[4];	//´íÎó´úÂë
     		break;
     	default:
     		break;

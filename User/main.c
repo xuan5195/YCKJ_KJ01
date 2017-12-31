@@ -7,9 +7,9 @@ uint8_t Time_250ms=0;
 uint8_t ShowFlag=0x00;
 uint16_t ShowCount=0; 	//用于正常待机时交替显示
 uint8_t gErrorShow=0;	//异常显示代码 在服务器未更新前显示使用，这样不会出现E000
-uint8_t gErrorDat[4]={0};	//异常代码存储
+uint8_t gErrorDat[6]={0};	//异常代码存储
 uint8_t Logic_ADD=0;	//逻辑地址
-uint8_t Physical_ADD[4]={0x20,0x17,0x12,0x0A};//物理地址
+uint8_t Physical_ADD[4]={0x20,0x17,0x12,0x01};//物理地址
 uint8_t WaterCost=50,CostNum=29;	//WaterCost=水费 最小扣款金额  //脉冲数
 uint8_t g_RxMessage[8]={0};	//CAN接收数据
 uint8_t g_RxMessFlag=0;		//CAN接收数据 标志
@@ -24,6 +24,7 @@ uint8_t BeforeFlag = 0xAA;	//更新标志 0xAA表示未更新;
 u8 InPutCount=0;	//输入脉冲计数
 uint8_t re_RxMessage[16]={0};
 uint32_t RFID_Money=0,OldRFID_Money = 0,u32TempDat=0,RFID_MoneyTemp=0;	//卡内金额
+uint8_t CardInFlag;
 extern unsigned char FM1702_Key[7];
 extern unsigned char UID[5];
 extern unsigned char FM1702_Buf[16];
@@ -136,7 +137,7 @@ int main(void)
 	uint8_t UseErrFlag = 0x00;	//用户或卡异常标志,接收到服务器返回数据后才显示异常代码值 否则显示‘E000’
 	uint8_t i=0;
 	uint32_t RFID_Money_Dat=0;	//卡内金额,用于错误时使用
-	uint8_t CardInFlag = 0,OldCardInFlag = 0;	//用于标记插卡、拔卡动作
+	uint8_t OldCardInFlag = 0;	//用于标记插卡、拔卡动作
 	
 	InitBoard();			//硬件初始化
 	
@@ -222,7 +223,8 @@ int main(void)
 							MemoryBuffer[8] = RFID_Money>>24;	//数据域8 校验
 							if((RFID_Money&0x00FFFFFF) > 0x00EA0000);	//错误异常时，不提交拔卡动作
 							else PutInMemoryBuf((u8 *)MemoryBuffer);
-							MemoryBuffer[0] = 0x00;		
+							MemoryBuffer[0] = 0x00;
+							gErrorDat[0]=0;	gErrorDat[1]=0;	gErrorDat[2]=0;	gErrorDat[3]=0;	gErrorDat[4]=0;	gErrorDat[5]=0;
 							OldCardInFlag = CardInFlag;
 						}
 						OldeUID[0]=UID[0];OldeUID[1]=UID[1];OldeUID[2]=UID[2];OldeUID[3]=UID[3];
@@ -331,8 +333,8 @@ int main(void)
 						if(gErrorDat[0]!=0x00)
 						{
 							InPutCount = 0;	OutPut_OFF();		//关闭水阀，放水
-							ErrorTemp[0] = ((gErrorDat[1]-0x30)<<4)|(gErrorDat[2]-0x30);
-							ErrorTemp[1] = gErrorDat[0]-0x30;
+							ErrorTemp[0] = gErrorDat[4]%10;
+							ErrorTemp[1] = gErrorDat[4]/10;
 							BspTm1639_ShowSNDat(0x12,(u8 *)ErrorTemp);//01.显示异常代码
 						}
 						if(OldCardInFlag != CardInFlag)	
@@ -413,20 +415,22 @@ int main(void)
 						}
 						for(i=0;i<16;i++)	re_RxMessage[i] = 0x00;
 					}
-					if((gErrorDat[0]==0x34)||(gErrorDat[0]==0x35)||(gErrorDat[0]==0x36)||(gErrorDat[0]==0x37))	//异常情况
+					if((gErrorDat[0]==UID[0])&&(gErrorDat[1]==UID[1])&&(gErrorDat[2]==UID[2])&&(gErrorDat[3]==UID[3])\
+						&&(gErrorDat[5] == FlagBit))	//异常情况
 					{
-						WriteMoney( FM1702_Key[6] , ErrorMoney+( (gErrorDat[0]-0x30)*10 + (gErrorDat[2]-0x30)) );
+						WriteMoney( FM1702_Key[6] , ErrorMoney+gErrorDat[4] );
 						RFID_MoneyTemp = ReadMoney(FM1702_Key[6]);	//读取卡内金额 使用地址块FM1702_Key[6]
 						if(RFID_MoneyTemp != ErrorMoney)		RFID_Money = RFID_MoneyTemp;	//读卡正确
 						else	{ RFID_Money = OldRFID_Money;	OldRFID_Money = RFID_Money;	}	//暂存卡内金额
+						gErrorDat[5] = 0xAA;//防止再次进入，重新写卡数据
 					}
 					
 				}
 				else	//没有读到卡
 				{
 					CardUnReadFlag=0xAA;RFID_Count=0;
-					if((gErrorDat[0]==0x34)||(gErrorDat[0]==0x35))	//用于卡相关或用户相关，在卡取走后，清异常代码防止异常代码闪烁
-					{gErrorDat[0] = 0x00;	gErrorDat[1] = 0x00;	gErrorDat[2] = 0x00;}	
+					if((gErrorDat[4]>=40))	//用于卡相关或用户相关，在卡取走后，清异常代码防止异常代码闪烁
+					{gErrorDat[0]=0;	gErrorDat[1]=0;	gErrorDat[2]=0;	gErrorDat[3]=0;	gErrorDat[4]=0;	gErrorDat[5]=0;}	
 					//CardFlag = 0x00;ReceiveFlag = 0x00;
 					ShowFlag = 0xAA;
 					UseErrFlag = 0x00;	//清用户或卡异常标志
