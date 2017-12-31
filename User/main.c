@@ -9,7 +9,7 @@ uint16_t ShowCount=0; 	//用于正常待机时交替显示
 uint8_t gErrorShow=0;	//异常显示代码 在服务器未更新前显示使用，这样不会出现E000
 uint8_t gErrorDat[4]={0};	//异常代码存储
 uint8_t Logic_ADD=0;	//逻辑地址
-uint8_t Physical_ADD[4]={0x20,0x17,0x12,0x03};//物理地址
+uint8_t Physical_ADD[4]={0x20,0x17,0x12,0x0A};//物理地址
 uint8_t WaterCost=50,CostNum=29;	//WaterCost=水费 最小扣款金额  //脉冲数
 uint8_t g_RxMessage[8]={0};	//CAN接收数据
 uint8_t g_RxMessFlag=0;		//CAN接收数据 标志
