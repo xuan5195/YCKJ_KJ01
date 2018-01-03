@@ -42,6 +42,7 @@
 #include "bsp_uart_fifo.h"
 #include "bsp_crc8.h"
 #include "bsp_adc.h"
+#include "bsp_stmflash.h"
 
 #define OutPut_ON()  GPIO_SetBits(GPIOB, GPIO_Pin_5)  	       	//
 #define OutPut_OFF()  GPIO_ResetBits(GPIOB, GPIO_Pin_5) 	   	//

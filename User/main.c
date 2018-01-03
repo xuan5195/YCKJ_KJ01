@@ -1,5 +1,6 @@
 #include "bsp.h"
 
+
 static void InitBoard(void);
 static void Delay (uint16_t nCount);
 
@@ -9,8 +10,6 @@ uint16_t ShowCount=0; 	//用于正常待机时交替显示
 uint8_t gErrorShow=0;	//异常显示代码 在服务器未更新前显示使用，这样不会出现E000
 uint8_t gErrorDat[6]={0};	//异常代码存储
 uint8_t Logic_ADD=0;	//逻辑地址
-uint8_t Physical_ADD[4]={0x20,0x17,0x12,0x01};//物理地址
-uint8_t WaterCost=50,CostNum=29;	//WaterCost=水费 最小扣款金额  //脉冲数
 uint8_t g_RxMessage[8]={0};	//CAN接收数据
 uint8_t g_RxMessFlag=0;		//CAN接收数据 标志
 uint8_t OutFlag=0,PowerUpFlag=0;	//放水标志,上电标志
@@ -24,9 +23,12 @@ uint8_t InPutCount=0;	//输入脉冲计数
 uint8_t re_RxMessage[16]={0};
 uint32_t RFID_Money=0,OldRFID_Money = 0,u32TempDat=0,RFID_MoneyTemp=0;	//卡内金额
 uint8_t CardInFlag;
-extern unsigned char FM1702_Key[7];
-extern unsigned char UID[5];
-extern unsigned char FM1702_Buf[16];
+uint8_t Flash_UpdateFlag=0x00;	//Flash有数据更新标志，0xAA表示有数据要更新
+extern uint8_t UID[5];
+extern uint8_t FM1702_Buf[16];
+extern uint8_t Physical_ADD[4];//物理地址
+extern uint8_t FM1702_Key[7];
+extern uint8_t WaterCost,CostNum;	//WaterCost=水费 最小扣款金额  //脉冲数
 
 void NVIC_Configuration(void)
 {
@@ -130,10 +132,10 @@ int main(void)
 	
 	CAN_Mode_Init(CAN_SJW_1tq,CAN_BS1_8tq,CAN_BS2_7tq,5,CAN_Mode_Normal);//CAN初始化正常模式,波特率450Kbps    
 	printf("Starting Up...\r\n");
-
+	Read_Flash_Dat();	//读取Flash数据
 	BspTm1639_Show(0x01,0x00);
 	ShowFlag = 0xAA;	//交替显示标志,0xAA为交替显示
-	//Logic_ADD = 1;	//测试使用
+	Logic_ADD = 1;	//测试使用
 	//PowerUpFlag=0xAA;	//测试使用
 	while(Logic_ADD==0)	//逻辑地址为0时，表示该设备未注册，进入等待注册过程
 	{
@@ -434,6 +436,12 @@ int main(void)
 					if(ShowCount==200)			{	SoftReset1702();	}		//检测RFID模块
 				}
 			
+			}
+
+			if(Flash_UpdateFlag == 0xAA)
+			{
+				Write_Flash_Dat();
+				Flash_UpdateFlag = 0;
 			}
 		}
 

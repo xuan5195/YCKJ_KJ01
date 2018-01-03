@@ -17,6 +17,7 @@ extern void PutOutMemoryBuf(void);	//清第一个缓存
 extern uint8_t re_RxMessage[16];
 extern unsigned char UID[5];
 extern uint8_t gErrorDat[6];	//异常代码存储
+extern uint8_t Flash_UpdateFlag;	//Flash有数据更新标志，0xAA表示有数据要更新
 
 //CAN初始化
 //tsjw:重新同步跳跃时间单元.范围:1~3; CAN_SJW_1tq	 CAN_SJW_2tq CAN_SJW_3tq CAN_SJW_4tq
@@ -127,11 +128,12 @@ void USB_LP_CAN1_RX0_IRQHandler(void)
 			{
 				FM1702_Key[0] = g_RxMessage[1];	FM1702_Key[1] = g_RxMessage[2];		FM1702_Key[2] = g_RxMessage[3];
 				FM1702_Key[3] = g_RxMessage[4];	FM1702_Key[4] = g_RxMessage[5];		FM1702_Key[5] = g_RxMessage[6];
-				FM1702_Key[6] = g_RxMessage[7];
+				FM1702_Key[6] = g_RxMessage[7]; Flash_UpdateFlag = 0xAA;
 			}
 			else if(g_RxMessage[0] == 0xA3)	//水费广播
 			{
 				WaterCost = g_RxMessage[1];  	CostNum = g_RxMessage[2];   //水费、费率
+				Flash_UpdateFlag = 0xAA;
 			}
 			else if(g_RxMessage[0] == 0xC1)	//写入逻辑地址
 			{

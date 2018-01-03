@@ -5,8 +5,8 @@
 
 
 unsigned char FM1702_Buf[16];
-unsigned char FM1702_Key[7]={0xFF,0xFF,0xFF,0xFF,0xFF,0xF1,41};
 unsigned char UID[5];			//卡号，最后一字节为校验数据
+extern uint8_t FM1702_Key[7];
 extern uint8_t gErrorShow;	//异常显示代码 在服务器未更新前显示使用，这样不会出现E000
 
 
