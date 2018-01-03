@@ -5,7 +5,7 @@
 unsigned char Tim3_Flag;
 
 void TIM3_Int_Init(u16 arr,u16 psc)
-{
+{	//Tout= ((arr+1)*(psc+1))/Tclk； Tclk：TIM3的输入时钟频率（单位为 Mhz）;Tout：TIM3溢出时间（单位为 us）
     TIM_TimeBaseInitTypeDef  TIM_TimeBaseStructure;
 	NVIC_InitTypeDef NVIC_InitStructure;
 

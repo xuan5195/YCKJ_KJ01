@@ -133,6 +133,58 @@ void SysTick_Handler(void)
 	SysTick_ISR();	/* 这个函数在bsp_timer.c中 */
 }
 
+u8  TIM2CH1_CAPTURE_STA=0;	//输入捕获状态		    				
+u16	TIM2CH1_CAPTURE_VAL;	//输入捕获值
+extern uint8_t InPutCount;	//输入脉冲计数
+extern uint8_t OutFlag; 	//输出标志
+
+//定时器5中断服务程序	 
+void TIM2_IRQHandler(void)
+{ 
+ 	if((TIM2CH1_CAPTURE_STA&0x80)==0)//还未成功捕获	
+	{	  
+		if (TIM_GetITStatus(TIM2, TIM_IT_Update) != RESET)	//更新中断		 
+		{	    
+			if(TIM2CH1_CAPTURE_STA&0x40)//已经捕获到高电平了
+			{
+				if((TIM2CH1_CAPTURE_STA&0x3F)==0x3F)//低电平太长，清标志
+				{
+					TIM2CH1_CAPTURE_STA = 0x00;	//清标志，等待下一次
+					TIM2CH1_CAPTURE_VAL = 0x00;
+				}
+				else TIM2CH1_CAPTURE_STA++;	//更新中断计数累加
+			}	 
+		}
+		if (TIM_GetITStatus(TIM2, TIM_IT_CC1) != RESET)//捕获1发生捕获事件
+		{	
+			if((TIM2CH1_CAPTURE_STA&0x40)==0x40)		//捕获到上升沿		
+			{	  			
+				TIM2CH1_CAPTURE_STA|=0x80;		//标记成功捕获到一次低电平脉宽
+				TIM2CH1_CAPTURE_VAL=TIM_GetCapture1(TIM2);	//取出捕获值
+		   		TIM_OC1PolarityConfig(TIM2,TIM_ICPolarity_Falling);		//CC1P=1 设置为下降沿捕获
+				//printf("low:%d us\r\n",TIM2CH1_CAPTURE_VAL);//打印总的低电平时间
+				if((TIM2CH1_CAPTURE_VAL>38)&&(TIM2CH1_CAPTURE_VAL<62)&&(TIM2CH1_CAPTURE_STA==0xC0))	//脉冲宽度
+				{	//脉冲宽度为42-58uS
+					if(OutFlag==0xAA)	{	InPutCount++;		}	//放水标志
+					else				{	InPutCount = 0;		}	//清计数
+				}
+				TIM2CH1_CAPTURE_STA=0x00;		//清准备下一次进入
+			}
+			else  								//捕获下降沿
+			{
+				TIM2CH1_CAPTURE_VAL = 0;		//清空
+				TIM2CH1_CAPTURE_STA = 0x40;		//标记捕获到了下降沿，并清更新中断计数(低6位)
+	 			TIM_SetCounter(TIM2,0);			//清计数值
+		   		TIM_OC1PolarityConfig(TIM2,TIM_ICPolarity_Rising); //CC1P=0 设置为上升沿捕获
+			}		    
+		}			     	    					   
+ 	}
+ 
+    TIM_ClearITPendingBit(TIM2, TIM_IT_CC1|TIM_IT_Update); //清除中断标志位
+ 
+}
+
+
 /*
 *********************************************************************************************************
 *	STM32F10x内部外设中断服务程序

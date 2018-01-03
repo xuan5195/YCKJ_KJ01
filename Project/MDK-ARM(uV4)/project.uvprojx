@@ -434,6 +434,11 @@
               <FileType>1</FileType>
               <FilePath>..\..\User\bsp\bsp_fm1701.c</FilePath>
             </File>
+            <File>
+              <FileName>bsp_Tim2.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\User\bsp\bsp_Tim2.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -938,6 +943,11 @@
               <FileType>1</FileType>
               <FilePath>..\..\User\bsp\bsp_fm1701.c</FilePath>
             </File>
+            <File>
+              <FileName>bsp_Tim2.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\User\bsp\bsp_Tim2.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -1441,6 +1451,11 @@
               <FileName>bsp_fm1701.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\User\bsp\bsp_fm1701.c</FilePath>
+            </File>
+            <File>
+              <FileName>bsp_Tim2.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\User\bsp\bsp_Tim2.c</FilePath>
             </File>
           </Files>
         </Group>

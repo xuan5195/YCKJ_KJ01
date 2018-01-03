@@ -24,7 +24,7 @@
 
 /* 未注释的行表示包含对应的外设头文件 */
 #include "stm32f10x_adc.h" 
-#include "stm32f10x_bkp.h"
+//#include "stm32f10x_bkp.h"
 #include "stm32f10x_can.h"
 #include "stm32f10x_cec.h"
 #include "stm32f10x_crc.h"

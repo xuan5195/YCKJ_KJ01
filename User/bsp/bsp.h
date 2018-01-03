@@ -35,6 +35,7 @@
 
 #include "bsp_timer.h"		/* systick¶¨Ê±Æ÷Ä£¿é */
 #include "bsp_TimerTim3.h"
+#include "bsp_Tim2.h"
 #include "bsp_tm1639.h"		
 #include "bsp_fm1701.h"		
 #include "bsp_can.h"
