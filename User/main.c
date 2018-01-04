@@ -135,7 +135,7 @@ int main(void)
 	Read_Flash_Dat();	//读取Flash数据
 	BspTm1639_Show(0x01,0x00);
 	ShowFlag = 0xAA;	//交替显示标志,0xAA为交替显示
-	Logic_ADD = 1;	//测试使用
+	//Logic_ADD = 1;	//测试使用
 	//PowerUpFlag=0xAA;	//测试使用
 	while(Logic_ADD==0)	//逻辑地址为0时，表示该设备未注册，进入等待注册过程
 	{

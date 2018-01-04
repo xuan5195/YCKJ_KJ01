@@ -3,7 +3,7 @@
 
 #define FLASH_SAVE_ADD		0x0800FC00		//Flash存储起始地址 为Flash最后一页，大小为1K
 
-uint8_t Physical_ADD[4]={0x20,0x17,0x12,0x01};//物理地址
+uint8_t Physical_ADD[4]={0x20,0x17,0x12,0x0A};//物理地址
 uint8_t FM1702_Key[7]={0xFF,0xFF,0xFF,0xFF,0xFF,0xF1,0x29};
 uint8_t WaterCost=50,CostNum=29;	//WaterCost=水费 最小扣款金额  //脉冲数
 
@@ -51,40 +51,58 @@ void Read_Flash_Dat(void)
 {
 	u8 datatemp[16]={0};
 	STMFLASH_Read(FLASH_SAVE_ADD,datatemp,16);
-	if((CRC8_Table(datatemp,15)==datatemp[15])&&(datatemp[0]==0xAA))
+	if((datatemp[0]!=0x00)&&(datatemp[0]!=0xFF)&&(datatemp[1]!=0x00)&&(datatemp[1]!=0xFF))
 	{
-		Physical_ADD[0] = datatemp[1];	//物理地址0
-		Physical_ADD[1] = datatemp[2];	//物理地址1
-		Physical_ADD[2] = datatemp[3];	//物理地址2
-		Physical_ADD[3] = datatemp[4];	//物理地址3
-		FM1702_Key[0] = datatemp[5];	//RFID_key0
-		FM1702_Key[1] = datatemp[6];	//RFID_key1
-		FM1702_Key[2] = datatemp[7];	//RFID_key2
-		FM1702_Key[3] = datatemp[8];	//RFID_key3
-		FM1702_Key[4] = datatemp[9];	//RFID_key4
-		FM1702_Key[5] = datatemp[10];	//RFID_key5
-		FM1702_Key[6] = datatemp[11];	//块地址
-		WaterCost = datatemp[12];		//水费 最小扣款金额
-		CostNum = datatemp[13];			//脉冲数
+		Physical_ADD[0] = datatemp[0];	//物理地址0
+		Physical_ADD[1] = datatemp[1];	//物理地址1
+		Physical_ADD[2] = datatemp[2];	//物理地址2
+		Physical_ADD[3] = datatemp[3];	//物理地址3
+		if(( CRC8_Table(datatemp+4,11) == datatemp[15] )&&( datatemp[4] == 0xAA ))
+		{
+			FM1702_Key[0] 	= datatemp[5];	//RFID_key0
+			FM1702_Key[1] 	= datatemp[6];	//RFID_key1
+			FM1702_Key[2] 	= datatemp[7];	//RFID_key2
+			FM1702_Key[3] 	= datatemp[8];	//RFID_key3
+			FM1702_Key[4] 	= datatemp[9];	//RFID_key4
+			FM1702_Key[5] 	= datatemp[10];	//RFID_key5
+			FM1702_Key[6] 	= datatemp[11];	//块地址
+			WaterCost 		= datatemp[12];	//水费 最小扣款金额
+			CostNum 		= datatemp[13];	//脉冲数
+		}
+		else
+		{
+			datatemp[ 5] = FM1702_Key[0];	//RFID_key0
+			datatemp[ 6] = FM1702_Key[1];	//RFID_key1
+			datatemp[ 7] = FM1702_Key[2];	//RFID_key2
+			datatemp[ 8] = FM1702_Key[3];	//RFID_key3
+			datatemp[ 9] = FM1702_Key[4];	//RFID_key4
+			datatemp[10] = FM1702_Key[5];	//RFID_key5
+			datatemp[11] = FM1702_Key[6];	//块地址
+			datatemp[12] = WaterCost;		//水费 最小扣款金额
+			datatemp[13] = CostNum;			//脉冲数
+			datatemp[14] = 00;				//空
+			datatemp[15] = CRC8_Table(datatemp+4,11);
+			STMFLASH_Write(FLASH_SAVE_ADD,datatemp,16);			
+		}			
 	}
 	else
 	{
-		datatemp[0] = 0xAA;				//标志位
-		datatemp[1] = Physical_ADD[0];	//物理地址0
-		datatemp[2] = Physical_ADD[1];	//物理地址1
-		datatemp[3] = Physical_ADD[2];	//物理地址2
-		datatemp[4] = Physical_ADD[3];	//物理地址3
-		datatemp[5] = FM1702_Key[0];	//RFID_key0
-		datatemp[6] = FM1702_Key[1];	//RFID_key1
-		datatemp[7] = FM1702_Key[2];	//RFID_key2
-		datatemp[8] = FM1702_Key[3];	//RFID_key3
-		datatemp[9] = FM1702_Key[4];	//RFID_key4
+		datatemp[ 0] = Physical_ADD[0];	//物理地址0
+		datatemp[ 1] = Physical_ADD[1];	//物理地址1
+		datatemp[ 2] = Physical_ADD[2];	//物理地址2
+		datatemp[ 3] = Physical_ADD[3];	//物理地址3
+		datatemp[ 4] = 0xAA;			//标志位
+		datatemp[ 5] = FM1702_Key[0];	//RFID_key0
+		datatemp[ 6] = FM1702_Key[1];	//RFID_key1
+		datatemp[ 7] = FM1702_Key[2];	//RFID_key2
+		datatemp[ 8] = FM1702_Key[3];	//RFID_key3
+		datatemp[ 9] = FM1702_Key[4];	//RFID_key4
 		datatemp[10] = FM1702_Key[5];	//RFID_key5
 		datatemp[11] = FM1702_Key[6];	//块地址
 		datatemp[12] = WaterCost;		//水费 最小扣款金额
 		datatemp[13] = CostNum;			//脉冲数
 		datatemp[14] = 00;				//空
-		datatemp[15] = CRC8_Table(datatemp,15);
+		datatemp[15] = CRC8_Table(datatemp+4,11);
 		STMFLASH_Write(FLASH_SAVE_ADD,datatemp,16);
 	}
 }
@@ -93,22 +111,22 @@ void Write_Flash_Dat(void)
 {
 	u8 datatemp1[16]={0},datatemp2[16]={0};
 	STMFLASH_Read(FLASH_SAVE_ADD,datatemp1,16);	//读出的值 对比 以下要写入的值
-	datatemp2[0] = 0xAA;				//标志位
-	datatemp2[1] = Physical_ADD[0];	//物理地址0
-	datatemp2[2] = Physical_ADD[1];	//物理地址1
-	datatemp2[3] = Physical_ADD[2];	//物理地址2
-	datatemp2[4] = Physical_ADD[3];	//物理地址3
-	datatemp2[5] = FM1702_Key[0];	//RFID_key0
-	datatemp2[6] = FM1702_Key[1];	//RFID_key1
-	datatemp2[7] = FM1702_Key[2];	//RFID_key2
-	datatemp2[8] = FM1702_Key[3];	//RFID_key3
-	datatemp2[9] = FM1702_Key[4];	//RFID_key4
+	datatemp2[ 0] = Physical_ADD[0];//物理地址0
+	datatemp2[ 1] = Physical_ADD[1];//物理地址1
+	datatemp2[ 2] = Physical_ADD[2];//物理地址2
+	datatemp2[ 3] = Physical_ADD[3];//物理地址3
+	datatemp2[ 4] = 0xAA;			//标志位
+	datatemp2[ 5] = FM1702_Key[0];	//RFID_key0
+	datatemp2[ 6] = FM1702_Key[1];	//RFID_key1
+	datatemp2[ 7] = FM1702_Key[2];	//RFID_key2
+	datatemp2[ 8] = FM1702_Key[3];	//RFID_key3
+	datatemp2[ 9] = FM1702_Key[4];	//RFID_key4
 	datatemp2[10] = FM1702_Key[5];	//RFID_key5
 	datatemp2[11] = FM1702_Key[6];	//块地址
 	datatemp2[12] = WaterCost;		//水费 最小扣款金额
 	datatemp2[13] = CostNum;		//脉冲数
 	datatemp2[14] = 00;				//空
-	datatemp2[15] = CRC8_Table(datatemp2,15);
+	datatemp2[15] = CRC8_Table(datatemp2+4,11);
 	if((datatemp2[15]!=datatemp1[15])||(datatemp2[13]!=datatemp1[13])||(datatemp2[12]!=datatemp1[12])||\
 	   (datatemp2[11]!=datatemp1[11])||(datatemp2[10]!=datatemp1[10])||(datatemp2[ 9]!=datatemp1[ 9])||\
 	   (datatemp2[ 8]!=datatemp1[ 8])||(datatemp2[ 7]!=datatemp1[ 7])||(datatemp2[ 6]!=datatemp1[ 6])||\

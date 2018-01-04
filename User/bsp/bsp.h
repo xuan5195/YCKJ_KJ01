@@ -30,7 +30,7 @@
 	#define FALSE 0
 #endif
 
-#define VERSION		    0xA1		/* 固件版本号 */
+#define VERSION		    0x01		/* 固件版本号 */
 
 
 #include "bsp_timer.h"		/* systick定时器模块 */
