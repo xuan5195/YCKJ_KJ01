@@ -3,7 +3,7 @@
 
 #define FLASH_SAVE_ADD		0x0800FC00		//Flash存储起始地址 为Flash最后一页，大小为1K
 
-uint8_t Physical_ADD[4]={0x20,0x17,0x12,0x19};//物理地址
+uint8_t Physical_ADD[4]={0x20,0x17,0x12,0x1A};//物理地址
 uint8_t FM1702_Key[7]={0xFF,0xFF,0xFF,0xFF,0xFF,0xF1,0x29};
 uint8_t WaterCost=50,CostNum=29;	//WaterCost=水费 最小扣款金额  //脉冲数
 

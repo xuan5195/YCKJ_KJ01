@@ -138,7 +138,7 @@ u16	TIM2CH1_CAPTURE_VAL;	//输入捕获值
 extern uint8_t InPutCount;	//输入脉冲计数
 extern uint8_t OutFlag; 	//输出标志
 
-//定时器5中断服务程序	 
+//定时器2中断服务程序	 
 void TIM2_IRQHandler(void)
 { 
  	if((TIM2CH1_CAPTURE_STA&0x80)==0)//还未成功捕获	

@@ -128,11 +128,17 @@ int main(void)
 	uint32_t RFID_Money_Dat=0;	//卡内金额,用于错误时使用
 	uint8_t OldCardInFlag = 0;	//用于标记插卡、拔卡动作
 	
+	SystemInit();
+    NVIC_SetVectorTable(NVIC_VectTab_FLASH, 0x3C00); //设置中断向量表的位置在 0x3C00
 	InitBoard();			//硬件初始化
+	Delay(0xFFFF); 	//上电简单延时一下  
 	
 	CAN_Mode_Init(CAN_SJW_1tq,CAN_BS1_8tq,CAN_BS2_7tq,5,CAN_Mode_Normal);//CAN初始化正常模式,波特率450Kbps    
-	printf("Starting Up...\r\n");
+	printf("Starting Up...\r\nYCKJ-KJ01 V3.2...\r\n");
 	Read_Flash_Dat();	//读取Flash数据
+	printf("Physical_ADD:%02X%02X%02X%02X;\r\n",Physical_ADD[0],Physical_ADD[1],Physical_ADD[2],Physical_ADD[3]);
+	printf("FM1702_Key:%02X%02X%02X%02X%02X%02X; %02d;\r\n",FM1702_Key[0],FM1702_Key[1],FM1702_Key[2],FM1702_Key[3],FM1702_Key[4],FM1702_Key[5],FM1702_Key[6]);
+	printf("WaterCost:0.%03d; CostNum:%02d;\r\n",WaterCost,CostNum);
 	BspTm1639_Show(0x01,0x00);
 	ShowFlag = 0xAA;	//交替显示标志,0xAA为交替显示
 	//Logic_ADD = 1;	//测试使用
@@ -461,10 +467,10 @@ static void InitBoard(void)
 	RCC_Configuration();
 	/* 初始化systick定时器，并启动定时中断 */
 	bsp_InitTimer(); 
-	NVIC_Configuration();
+	//NVIC_Configuration();
 	
 	Init_GPIO();		//输出初始化
-	bsp_InitUart(); 	//初始化串口
+	//bsp_InitUart(); 	//初始化串口,因为IAP中初始过
 	BspTm1639_Config();	//TM1639初始化
 	BspFM1701_Config();	//FM1701 GPIO初始化
 	TIM3_Int_Init(1999,720-1);//以100khz的频率计数，0.01ms中断，计数到2000 为20ms 
