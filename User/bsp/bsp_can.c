@@ -18,6 +18,7 @@ extern uint8_t re_RxMessage[16];
 extern unsigned char UID[5];
 extern uint8_t gErrorDat[6];	//异常代码存储
 extern uint8_t Flash_UpdateFlag;	//Flash有数据更新标志，0xAA表示有数据要更新
+extern uint8_t g_IAP_Flag;	//在线升级标志
 
 //CAN初始化
 //tsjw:重新同步跳跃时间单元.范围:1~3; CAN_SJW_1tq	 CAN_SJW_2tq CAN_SJW_3tq CAN_SJW_4tq
@@ -124,7 +125,12 @@ void USB_LP_CAN1_RX0_IRQHandler(void)
 		//if( g_RxMessFlag == 0xAA )//接收到新数据，从设备，中断方式接收
 		if((Logic_ADD!=0)&&( g_RxMessFlag == 0xAA ))//接收到新数据，从设备，中断方式接收
 		{
-			if(g_RxMessage[0] == 0xA2)	//广播 RFID卡存储信息 密码及块
+			if(g_RxMessage[0] == 0xA4)	//测试在线升级
+			{
+				g_IAP_Flag = 0xAA;	//清更新标志
+				Flash_UpdateFlag = 0xAA;
+			}
+			else if(g_RxMessage[0] == 0xA2)	//广播 RFID卡存储信息 密码及块
 			{
 				FM1702_Key[0] = g_RxMessage[1];	FM1702_Key[1] = g_RxMessage[2];		FM1702_Key[2] = g_RxMessage[3];
 				FM1702_Key[3] = g_RxMessage[4];	FM1702_Key[4] = g_RxMessage[5];		FM1702_Key[5] = g_RxMessage[6];

@@ -29,6 +29,7 @@ extern uint8_t FM1702_Buf[16];
 extern uint8_t Physical_ADD[4];//物理地址
 extern uint8_t FM1702_Key[7];
 extern uint8_t WaterCost,CostNum;	//WaterCost=水费 最小扣款金额  //脉冲数
+extern uint8_t g_IAP_Flag;	//在线升级标志
 
 void NVIC_Configuration(void)
 {
@@ -106,6 +107,12 @@ void Init_GPIO(void)
 
 }
 
+void SoftReset(void)
+{
+	__set_FAULTMASK(1);		// 关闭所有中端
+	NVIC_SystemReset();		// 复位
+}
+
 /*
 *********************************************************************************************************
 *	函 数 名: main
@@ -129,16 +136,21 @@ int main(void)
 	uint8_t OldCardInFlag = 0;	//用于标记插卡、拔卡动作
 	
 	SystemInit();
-    NVIC_SetVectorTable(NVIC_VectTab_FLASH, 0x3C00); //设置中断向量表的位置在 0x3C00
+    NVIC_SetVectorTable(NVIC_VectTab_FLASH, 0x5000); //设置中断向量表的位置在 0x5000
 	InitBoard();			//硬件初始化
 	Delay(0xFFFF); 	//上电简单延时一下  
 	
 	CAN_Mode_Init(CAN_SJW_1tq,CAN_BS1_8tq,CAN_BS2_7tq,5,CAN_Mode_Normal);//CAN初始化正常模式,波特率450Kbps    
-	printf("Starting Up...\r\nYCKJ-KJ01 V3.2...\r\n");
+	printf("\r\nStarting Up...\r\nYCKJ-KJ01 V3.0...\r\n");
 	Read_Flash_Dat();	//读取Flash数据
 	printf("Physical_ADD:%02X%02X%02X%02X;\r\n",Physical_ADD[0],Physical_ADD[1],Physical_ADD[2],Physical_ADD[3]);
 	printf("FM1702_Key:%02X%02X%02X%02X%02X%02X; %02d;\r\n",FM1702_Key[0],FM1702_Key[1],FM1702_Key[2],FM1702_Key[3],FM1702_Key[4],FM1702_Key[5],FM1702_Key[6]);
-	printf("WaterCost:0.%03d; CostNum:%02d;\r\n",WaterCost,CostNum);
+	printf("WaterCost:0.%03d; CostNum:%02d; g_IAP_Flag:0x%02X;\r\n",WaterCost,CostNum,g_IAP_Flag);
+	if(g_IAP_Flag == 0xAA)	//更新标志
+	{
+		g_IAP_Flag = 0x00;	//清更新标志
+		Write_Flash_Dat();
+	}
 	BspTm1639_Show(0x01,0x00);
 	ShowFlag = 0xAA;	//交替显示标志,0xAA为交替显示
 	//Logic_ADD = 1;	//测试使用
@@ -448,6 +460,7 @@ int main(void)
 			{
 				Write_Flash_Dat();
 				Flash_UpdateFlag = 0;
+				if(g_IAP_Flag == 0xAA)		SoftReset();//更新标志 软件复位
 			}
 		}
 

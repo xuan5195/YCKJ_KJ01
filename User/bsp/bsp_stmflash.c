@@ -3,10 +3,10 @@
 
 #define FLASH_SAVE_ADD		0x0800FC00		//Flash存储起始地址 为Flash最后一页，大小为1K
 
-uint8_t Physical_ADD[4]={0x20,0x17,0x12,0x1A};//物理地址
+uint8_t Physical_ADD[4]={0x20,0x17,0x12,0x1B};//物理地址
 uint8_t FM1702_Key[7]={0xFF,0xFF,0xFF,0xFF,0xFF,0xF1,0x29};
 uint8_t WaterCost=50,CostNum=29;	//WaterCost=水费 最小扣款金额  //脉冲数
-
+uint8_t g_IAP_Flag=0x00;	//在线升级标志
  
 //读取指定地址的半字(16位数据)
 //faddr:读地址(此地址必须为2的倍数!!)
@@ -68,6 +68,7 @@ void Read_Flash_Dat(void)
 			FM1702_Key[6] 	= datatemp[11];	//块地址
 			WaterCost 		= datatemp[12];	//水费 最小扣款金额
 			CostNum 		= datatemp[13];	//脉冲数
+			g_IAP_Flag 		= datatemp[14];	//程序升级标志
 		}
 		else
 		{
@@ -80,7 +81,7 @@ void Read_Flash_Dat(void)
 			datatemp[11] = FM1702_Key[6];	//块地址
 			datatemp[12] = WaterCost;		//水费 最小扣款金额
 			datatemp[13] = CostNum;			//脉冲数
-			datatemp[14] = 00;				//空
+			datatemp[14] = g_IAP_Flag;		//程序升级标志
 			datatemp[15] = CRC8_Table(datatemp+4,11);
 			STMFLASH_Write(FLASH_SAVE_ADD,datatemp,16);			
 		}			
@@ -101,7 +102,7 @@ void Read_Flash_Dat(void)
 		datatemp[11] = FM1702_Key[6];	//块地址
 		datatemp[12] = WaterCost;		//水费 最小扣款金额
 		datatemp[13] = CostNum;			//脉冲数
-		datatemp[14] = 00;				//空
+		datatemp[14] = g_IAP_Flag;		//程序升级标志
 		datatemp[15] = CRC8_Table(datatemp+4,11);
 		STMFLASH_Write(FLASH_SAVE_ADD,datatemp,16);
 	}
@@ -125,7 +126,7 @@ void Write_Flash_Dat(void)
 	datatemp2[11] = FM1702_Key[6];	//块地址
 	datatemp2[12] = WaterCost;		//水费 最小扣款金额
 	datatemp2[13] = CostNum;		//脉冲数
-	datatemp2[14] = 00;				//空
+	datatemp2[14] = g_IAP_Flag;		//程度升级标志
 	datatemp2[15] = CRC8_Table(datatemp2+4,11);
 	if((datatemp2[15]!=datatemp1[15])||(datatemp2[13]!=datatemp1[13])||(datatemp2[12]!=datatemp1[12])||\
 	   (datatemp2[11]!=datatemp1[11])||(datatemp2[10]!=datatemp1[10])||(datatemp2[ 9]!=datatemp1[ 9])||\
