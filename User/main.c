@@ -136,7 +136,7 @@ int main(void)
 	uint8_t OldCardInFlag = 0;	//用于标记插卡、拔卡动作
 	
 	SystemInit();
-    NVIC_SetVectorTable(NVIC_VectTab_FLASH, 0x5000); //设置中断向量表的位置在 0x5000
+    //NVIC_SetVectorTable(NVIC_VectTab_FLASH, 0x5000); //设置中断向量表的位置在 0x5000
 	InitBoard();			//硬件初始化
 	Delay(0xFFFF); 	//上电简单延时一下  
 	
