@@ -20,6 +20,7 @@ extern uint8_t gErrorDat[6];	//异常代码存储
 extern uint8_t Flash_UpdateFlag;	//Flash有数据更新标志，0xAA表示有数据要更新
 extern uint8_t g_IAP_Flag;	//在线升级标志
 
+
 //CAN初始化
 //tsjw:重新同步跳跃时间单元.范围:1~3; CAN_SJW_1tq	 CAN_SJW_2tq CAN_SJW_3tq CAN_SJW_4tq
 //tbs2:时间段2的时间单元.范围:1~8;
@@ -89,10 +90,24 @@ u8 CAN_Mode_Init(u8 tsjw,u8 tbs2,u8 tbs1,u16 brp,u8 mode)
 		CAN_FilterInitStructure.CAN_FilterMaskIdHigh=((ext_id<<3)>>16) & 0xffff; 		//设置屏蔽寄存器高字节  
 		CAN_FilterInitStructure.CAN_FilterMaskIdLow=((ext_id<<3)& 0xffff) | CAN_ID_EXT;	//设置屏蔽寄存器低字节  
 	}
-  	CAN_FilterInitStructure.CAN_FilterFIFOAssignment=CAN_Filter_FIFO0;//过滤器0关联到FIFO0
- 	CAN_FilterInitStructure.CAN_FilterActivation=ENABLE; //激活过滤器0
+	CAN_FilterInitStructure.CAN_FilterFIFOAssignment=CAN_Filter_FIFO0;//过滤器0关联到FIFO0
+ 	CAN_FilterInitStructure.CAN_FilterActivation=ENABLE; //激活过滤器0	
+	CAN_FilterInit(&CAN_FilterInitStructure);//滤波器初始化
 
-  	CAN_FilterInit(&CAN_FilterInitStructure);//滤波器初始化
+	std_id = 0x100; std_id1 = 0x100|Physical_ADD[3];
+ 	CAN_FilterInitStructure.CAN_FilterNumber=9;	  //设置过滤器组1，范围为0~13  
+ 	CAN_FilterInitStructure.CAN_FilterMode=CAN_FilterMode_IdList;  //CAN_FilterMode_IdMask:屏蔽模式  CAN_FilterMode_IdList:列表模式
+  	CAN_FilterInitStructure.CAN_FilterScale=CAN_FilterScale_32bit; //设置过滤器位宽为32位  
+	{
+		CAN_FilterInitStructure.CAN_FilterIdHigh=std_id<<5;  		//设置标识符寄存器高字节  
+		CAN_FilterInitStructure.CAN_FilterIdLow=0|CAN_ID_STD;		//设置标识符寄存器低字节	
+		CAN_FilterInitStructure.CAN_FilterMaskIdHigh=std_id1<<5; 	//设置屏蔽寄存器高字节  
+		CAN_FilterInitStructure.CAN_FilterMaskIdLow=0|CAN_ID_STD;	//设置屏蔽寄存器低字节  
+	}
+	CAN_FilterInitStructure.CAN_FilterFIFOAssignment=CAN_Filter_FIFO0;//过滤器1关联到FIFO0
+ 	CAN_FilterInitStructure.CAN_FilterActivation=ENABLE; //激活过滤器1	
+	CAN_FilterInit(&CAN_FilterInitStructure);//滤波器初始化	
+	
 #if CAN_RX0_INT_ENABLE
 	
 	CAN_ITConfig(CAN1,CAN_IT_FMP0,ENABLE);//FIFO0消息挂号中断允许.		    
@@ -123,7 +138,17 @@ void USB_LP_CAN1_RX0_IRQHandler(void)
 		}
 		g_RxMessFlag = 0xAA;
 		//if( g_RxMessFlag == 0xAA )//接收到新数据，从设备，中断方式接收
-		if((Logic_ADD!=0)&&( g_RxMessFlag == 0xAA ))//接收到新数据，从设备，中断方式接收
+		if((Logic_ADD==0)&&( g_RxMessFlag == 0xAA ))//接收到有数据
+		{
+			if((g_RxMessage[0]==0xC1)\
+				&&(g_RxMessage[1]==Physical_ADD[0])&&(g_RxMessage[2]==Physical_ADD[1])\
+				&&(g_RxMessage[3]==Physical_ADD[2])&&(g_RxMessage[4]==Physical_ADD[3]))
+			{
+				Logic_ADD = g_RxMessage[5];	//取出分配的逻辑地址
+				Package_Send(0xC2,(u8 *)Physical_ADD);
+			}
+		}
+		else if((Logic_ADD!=0)&&( g_RxMessFlag == 0xAA ))//接收到新数据，从设备，中断方式接收
 		{
 			if(g_RxMessage[0] == 0xA4)	//测试在线升级
 			{
@@ -254,11 +279,12 @@ u8 Can_Send_Msg(u8* msg,u8 len)
 	u8 mbox;
 	u16 i=0;
 	CanTxMsg TxMessage;
-	if((msg[0]==0xB3)||(msg[0]==0xC2))	
-		TxMessage.StdId=0x200;			// 标准标识符为0
+	if(msg[0]==0xB3)	
+		TxMessage.StdId=0x100|Physical_ADD[3];			// 标准标识符为0
+	else if(msg[0]==0xC2)	
+		TxMessage.StdId=0x100|Physical_ADD[3];			// 标准标识符为0
 	else				
 		TxMessage.StdId=0x200|msg[1];	// 标准标识符为0
-	//TxMessage.StdId=0x200;			// 标准标识符为0
 	TxMessage.ExtId=0x1800F001;			// 设置扩展标示符（29位）
 	TxMessage.IDE=0;			// 不使用扩展标识符
 	TxMessage.RTR=0;		// 消息类型：CAN_RTR_Data为数据帧;CAN_RTR_Remote为远程帧
