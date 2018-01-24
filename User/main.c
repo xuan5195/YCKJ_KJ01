@@ -1,15 +1,17 @@
 #include "bsp.h"
+#include <stdlib.h>  
+#define IAP_Flag	1		//IAP标志 0表示没使用在线升级功能
 
 
 static void InitBoard(void);
-static void Delay (uint16_t nCount);
+void Delay (uint16_t nCount);
 
 uint8_t Time_250ms=0;
 uint8_t ShowFlag=0x00;
 uint16_t ShowCount=0; 	//用于正常待机时交替显示
 uint8_t gErrorShow=0;	//异常显示代码 在服务器未更新前显示使用，这样不会出现E000
 uint8_t gErrorDat[6]={0};	//异常代码存储
-uint8_t Logic_ADD=0;	//逻辑地址
+uint8_t Logic_ADD=0;		//逻辑地址
 uint8_t g_RxMessage[8]={0};	//CAN接收数据
 uint8_t g_RxMessFlag=0;		//CAN接收数据 标志
 uint8_t OutFlag=0,PowerUpFlag=0;	//放水标志,上电标志
@@ -17,13 +19,16 @@ uint8_t g_MemoryBuf[5][10]={0};	//数据缓存，[0]=0xAA表示有插卡数据，[0]=0xBB表示
 uint8_t FlagBit = 0x00;		//通信标志位，每插入卡一次数据加1，数值达到199时，清0
 uint16_t Beforeupdate = 0;	//远程更新前的扣费金额;
 uint16_t OvertimeCount=0;	//超时计数
+uint8_t Time20msCount=0;	//
 uint8_t OvertimeMinutes=0;	//超时分钟，超时标志 0xAA表示超时
 uint8_t BeforeFlag = 0xAA;	//更新标志 0xAA表示未更新; 
-uint8_t InPutCount=0;	//输入脉冲计数
+uint8_t InPutCount=0;		//输入脉冲计数
 uint8_t re_RxMessage[16]={0};
 uint32_t RFID_Money=0,OldRFID_Money = 0,u32TempDat=0,RFID_MoneyTemp=0;	//卡内金额
 uint8_t CardInFlag;
 uint8_t Flash_UpdateFlag=0x00;	//Flash有数据更新标志，0xAA表示有数据要更新
+uint8_t DelayCount=0;			//上电随机延时
+uint8_t g_LoseContact=0;		//失联计数，大于200时，表示失联，自动复位
 extern uint8_t UID[5];
 extern uint8_t FM1702_Buf[16];
 extern uint8_t Physical_ADD[4];//物理地址
@@ -123,7 +128,6 @@ void SoftReset(void)
 */
 int main(void)
 {
-	uint8_t DelayCount=0;
 	uint8_t PUSendCount = 0x00;	//上电发送随机数次数；
 	uint8_t CardUnReadFlag=0xAA;	//读卡标志，用于延时执行取卡动作
 	uint8_t OldeUID[5];			//卡号，OldeUID[4]为校验数据
@@ -136,12 +140,17 @@ int main(void)
 	uint8_t OldCardInFlag = 0;	//用于标记插卡、拔卡动作
 	
 	SystemInit();
-    NVIC_SetVectorTable(NVIC_VectTab_FLASH, 0x5000); //设置中断向量表的位置在 0x5000
+	
+	#if IAP_Flag
+		NVIC_SetVectorTable(NVIC_VectTab_FLASH, 0x5000); //设置中断向量表的位置在 0x5000，并且将Target的IROM1起始改为0x08005000.
+	#endif
+	
 	InitBoard();			//硬件初始化
 	Delay(0xFFFF); 	//上电简单延时一下  
 	
-	CAN_Mode_Init(CAN_SJW_1tq,CAN_BS1_8tq,CAN_BS2_7tq,5,CAN_Mode_Normal);//CAN初始化正常模式,波特率450Kbps    
+	CAN_Mode_Init(CAN_SJW_1tq,CAN_BS1_8tq,CAN_BS2_7tq,18,CAN_Mode_Normal);//CAN初始化正常模式,波特率450Kbps    
 	printf("\r\nStarting Up...\r\nYCKJ-KJ01 V3.0...\r\n");
+	printf("VersionNo: %02X...\r\n",VERSION);
 	Read_Flash_Dat();	//读取Flash数据
 	printf("Physical_ADD:%02X%02X%02X%02X;\r\n",Physical_ADD[0],Physical_ADD[1],Physical_ADD[2],Physical_ADD[3]);
 	printf("FM1702_Key:%02X%02X%02X%02X%02X%02X; %02d;\r\n",FM1702_Key[0],FM1702_Key[1],FM1702_Key[2],FM1702_Key[3],FM1702_Key[4],FM1702_Key[5],FM1702_Key[6]);
@@ -150,31 +159,51 @@ int main(void)
 	{
 		g_IAP_Flag = 0x00;	//清更新标志
 		Write_Flash_Dat();
+		printf("g_IAP_Flag:0x%02X;\r\n",g_IAP_Flag);
 	}
 	BspTm1639_Show(0x01,0x00);
 	ShowFlag = 0xAA;	//交替显示标志,0xAA为交替显示
 	//Logic_ADD = 1;	//测试使用
 	//PowerUpFlag=0xAA;	//测试使用
+	srand((Physical_ADD[2]<<8)|(Physical_ADD[3]));	//使用物理地址后二位作为种子
 	while(Logic_ADD==0)	//逻辑地址为0时，表示该设备未注册，进入等待注册过程
 	{
 		if(PowerUpFlag==0xAA)
 		{
-			DelayCount = Read_Rand();  //产生0-50的随机数
-			while(DelayCount--)		Delay(0x8F);	//简单延时
-			if(PUSendCount<30)	{	Package_Send(0xB3,(u8 *)Physical_ADD);	PUSendCount++;	Delay(0xFF);}	
-			else				{	PUSendCount = 200;	}				
+			if(DelayCount==0)
+			{				
+				DelayCount = rand()% 100;  //产生0-99的随机数
+//			else
+//			{
+//				if( (ShowCount%25) == 0 )	//20ms中断，20ms*25=500ms
+//				{
+//					DelayCount--;
+//				}
+//			}
+//			while((DelayCount--)&&(Logic_ADD==0))
+//			{
+//				Delay(0xFFFF);	//简单延时
+//				if(PUSendCount>15)	Delay(0xFFFF);	//简单延时
+//			}
+			//if(PUSendCount<30) printf("Delay(0xFFF);\r\n");
+				if(Logic_ADD==0)
+				{
+					if(PUSendCount<30)	{	Package_Send(0xB3,(u8 *)Physical_ADD);	PUSendCount++;	Delay(0xFF);}	
+					else				{	PUSendCount = 200;	}
+				}
+			}				
 		}
 
 		if( g_RxMessFlag == 0xAA )//接收到有数据
 		{
 			if((g_RxMessage[0]==0xA1)&&(g_RxMessage[1]==0xA1))	{	PowerUpFlag=0xAA;	}//进入随机延时未注册回复
-			else if((g_RxMessage[0]==0xC1)\
-				&&(g_RxMessage[1]==Physical_ADD[0])&&(g_RxMessage[2]==Physical_ADD[1])\
-				&&(g_RxMessage[3]==Physical_ADD[2])&&(g_RxMessage[4]==Physical_ADD[3]))
-			{
-				Logic_ADD = g_RxMessage[5];	//取出分配的逻辑地址
-				Package_Send(0xC2,(u8 *)Physical_ADD);
-			}
+//			else if((g_RxMessage[0]==0xC1)\
+//				&&(g_RxMessage[1]==Physical_ADD[0])&&(g_RxMessage[2]==Physical_ADD[1])\
+//				&&(g_RxMessage[3]==Physical_ADD[2])&&(g_RxMessage[4]==Physical_ADD[3]))
+//			{
+//				Logic_ADD = g_RxMessage[5];	//取出分配的逻辑地址
+//				Package_Send(0xC2,(u8 *)Physical_ADD);
+//			}
 			g_RxMessFlag = 0x00;
 		}
 		
@@ -189,7 +218,8 @@ int main(void)
 		}
 	}
 	CAN_DeInit(CAN1);
-	CAN_Mode_Init(CAN_SJW_1tq,CAN_BS1_8tq,CAN_BS2_7tq,5,CAN_Mode_Normal);//CAN初始化正常模式,波特率450Kbps    
+	CAN_Mode_Init(CAN_SJW_1tq,CAN_BS1_8tq,CAN_BS2_7tq,18,CAN_Mode_Normal);//CAN初始化正常模式,波特率450Kbps 
+	ShowCount = 0;g_RxMessFlag = 0x00;	
 	BspTm1639_Show(0x03,WaterCost);	//显示每升水金额值
 	bsp_StartTimer(1, 200);		//定时器1周期 200毫秒
 	while (1)
@@ -447,9 +477,9 @@ int main(void)
 					InPutCount = 0;
 					OvertimeCount=0;OvertimeMinutes=0;//有扣费，清超时标志
 					OutFlag = 0x00;		OutPut_OFF();	//关闭水阀，放水
-					if(ShowCount<148)			BspTm1639_ShowSNDat(0x11,(u8 *)Physical_ADD);
+					if(ShowCount<148)			BspTm1639_Show(0x03,WaterCost);	//显示每升水金额值
 					else if(ShowCount<150)		BspTm1639_Show(0x00,0x00);		//关显示
-					else if(ShowCount<298)		BspTm1639_Show(0x03,WaterCost);	//显示每升水金额值
+					else if(ShowCount<298)		BspTm1639_ShowSNDat(0x11,(u8 *)Physical_ADD);
 					else						BspTm1639_Show(0x00,0x00);		//关显示	
 					if(ShowCount==200)			{	SoftReset1702();	}		//检测RFID模块
 				}
@@ -462,6 +492,7 @@ int main(void)
 				Flash_UpdateFlag = 0;
 				if(g_IAP_Flag == 0xAA)		SoftReset();//更新标志 软件复位
 			}
+			if(g_LoseContact>36)		SoftReset();//失联 软件复位 5*36=18秒=3min，5秒钟累加一；在定时器累加
 		}
 
 	}
@@ -483,7 +514,10 @@ static void InitBoard(void)
 	//NVIC_Configuration();
 	
 	Init_GPIO();		//输出初始化
-	//bsp_InitUart(); 	//初始化串口,因为IAP中初始过
+	#if IAP_Flag
+	#else
+		bsp_InitUart(); 	//初始化串口,因为IAP中初始过
+	#endif
 	BspTm1639_Config();	//TM1639初始化
 	BspFM1701_Config();	//FM1701 GPIO初始化
 	TIM3_Int_Init(1999,720-1);//以100khz的频率计数，0.01ms中断，计数到2000 为20ms 
@@ -502,6 +536,8 @@ void TIM3_IRQHandler(void)   //TIM3中断
 		{
 			if( ShowCount < 300 )  	ShowCount++;	//300*20=6000，6秒一个显示周期
 			else					ShowCount = 0;
+			
+			if( DelayCount > 0 )	{	if( (ShowCount%2)==0 )	DelayCount--;	}	//20ms中断	20*2=40ms
 		}
 		else    ShowCount = 0;
 		
@@ -512,6 +548,13 @@ void TIM3_IRQHandler(void)   //TIM3中断
 			OvertimeCount=0;
 			if(OvertimeMinutes<10)	OvertimeMinutes++;	//超时10分钟
 			else				  	OvertimeMinutes = 0xAA;//超时标志
+		}
+		if(Time20msCount<250)	Time20msCount++;	//5秒 250 *20ms = 5000ms
+		else	
+		{	
+			Time20msCount=0;
+			if(g_LoseContact<255)	g_LoseContact++;	//失联计数，5秒加一；
+			else					g_LoseContact=255;
 		}
 		TIM_ClearITPendingBit(TIM3, TIM_IT_Update  );  //清除TIMx更新中断标志 					
 	}

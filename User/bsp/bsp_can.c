@@ -16,9 +16,13 @@ extern uint8_t g_MemoryBuf[5][10];	//Êı¾İ»º´æ£¬[0]=0xAA±íÊ¾ÓĞ²å¿¨Êı¾İ£¬[0]=0xBB±
 extern void PutOutMemoryBuf(void);	//ÇåµÚÒ»¸ö»º´æ
 extern uint8_t re_RxMessage[16];
 extern unsigned char UID[5];
-extern uint8_t gErrorDat[6];	//Òì³£´úÂë´æ´¢
+extern uint8_t gErrorDat[6];		//Òì³£´úÂë´æ´¢
 extern uint8_t Flash_UpdateFlag;	//FlashÓĞÊı¾İ¸üĞÂ±êÖ¾£¬0xAA±íÊ¾ÓĞÊı¾İÒª¸üĞÂ
-extern uint8_t g_IAP_Flag;	//ÔÚÏßÉı¼¶±êÖ¾
+extern uint8_t g_IAP_Flag;			//ÔÚÏßÉı¼¶±êÖ¾
+extern uint8_t g_LoseContact;		//Ê§Áª¼ÆÊı£¬´óÓÚ200Ê±£¬±íÊ¾Ê§Áª£¬×Ô¶¯¸´Î»
+
+extern void Delay (uint16_t nCount);
+
 
 //CAN³õÊ¼»¯
 //tsjw:ÖØĞÂÍ¬²½ÌøÔ¾Ê±¼äµ¥Ôª.·¶Î§:1~3; CAN_SJW_1tq	 CAN_SJW_2tq CAN_SJW_3tq CAN_SJW_4tq
@@ -30,6 +34,7 @@ extern uint8_t g_IAP_Flag;	//ÔÚÏßÉı¼¶±êÖ¾
 //mode:0,ÆÕÍ¨Ä£Ê½;1,»Ø»·Ä£Ê½;
 //Fpclk1µÄÊ±ÖÓÔÚ³õÊ¼»¯µÄÊ±ºòÉèÖÃÎª36M,Èç¹ûÉèÖÃCAN_Normal_Init(1,8,7,5,1);
 //Ôò²¨ÌØÂÊÎª:36M/((1+8+7)*5)=450Kbps
+//Ôò²¨ÌØÂÊÎª:36M/((1+13+2)*18)=125Kbps CAN_Normal_Init(1,13,2,18,1);
 //·µ»ØÖµ:0,³õÊ¼»¯OK;	ÆäËû,³õÊ¼»¯Ê§°Ü;
 
 
@@ -89,10 +94,24 @@ u8 CAN_Mode_Init(u8 tsjw,u8 tbs2,u8 tbs1,u16 brp,u8 mode)
 		CAN_FilterInitStructure.CAN_FilterMaskIdHigh=((ext_id<<3)>>16) & 0xffff; 		//ÉèÖÃÆÁ±Î¼Ä´æÆ÷¸ß×Ö½Ú  
 		CAN_FilterInitStructure.CAN_FilterMaskIdLow=((ext_id<<3)& 0xffff) | CAN_ID_EXT;	//ÉèÖÃÆÁ±Î¼Ä´æÆ÷µÍ×Ö½Ú  
 	}
-  	CAN_FilterInitStructure.CAN_FilterFIFOAssignment=CAN_Filter_FIFO0;//¹ıÂËÆ÷0¹ØÁªµ½FIFO0
- 	CAN_FilterInitStructure.CAN_FilterActivation=ENABLE; //¼¤»î¹ıÂËÆ÷0
+	CAN_FilterInitStructure.CAN_FilterFIFOAssignment=CAN_Filter_FIFO0;//¹ıÂËÆ÷0¹ØÁªµ½FIFO0
+ 	CAN_FilterInitStructure.CAN_FilterActivation=ENABLE; //¼¤»î¹ıÂËÆ÷0	
+	CAN_FilterInit(&CAN_FilterInitStructure);//ÂË²¨Æ÷³õÊ¼»¯
 
-  	CAN_FilterInit(&CAN_FilterInitStructure);//ÂË²¨Æ÷³õÊ¼»¯
+	std_id = 0x100; std_id1 = 0x100|Physical_ADD[3];
+ 	CAN_FilterInitStructure.CAN_FilterNumber=9;	  //ÉèÖÃ¹ıÂËÆ÷×é1£¬·¶Î§Îª0~13  
+ 	CAN_FilterInitStructure.CAN_FilterMode=CAN_FilterMode_IdList;  //CAN_FilterMode_IdMask:ÆÁ±ÎÄ£Ê½  CAN_FilterMode_IdList:ÁĞ±íÄ£Ê½
+  	CAN_FilterInitStructure.CAN_FilterScale=CAN_FilterScale_32bit; //ÉèÖÃ¹ıÂËÆ÷Î»¿íÎª32Î»  
+	{
+		CAN_FilterInitStructure.CAN_FilterIdHigh=std_id<<5;  		//ÉèÖÃ±êÊ¶·û¼Ä´æÆ÷¸ß×Ö½Ú  
+		CAN_FilterInitStructure.CAN_FilterIdLow=0|CAN_ID_STD;		//ÉèÖÃ±êÊ¶·û¼Ä´æÆ÷µÍ×Ö½Ú	
+		CAN_FilterInitStructure.CAN_FilterMaskIdHigh=std_id1<<5; 	//ÉèÖÃÆÁ±Î¼Ä´æÆ÷¸ß×Ö½Ú  
+		CAN_FilterInitStructure.CAN_FilterMaskIdLow=0|CAN_ID_STD;	//ÉèÖÃÆÁ±Î¼Ä´æÆ÷µÍ×Ö½Ú  
+	}
+	CAN_FilterInitStructure.CAN_FilterFIFOAssignment=CAN_Filter_FIFO0;//¹ıÂËÆ÷1¹ØÁªµ½FIFO0
+ 	CAN_FilterInitStructure.CAN_FilterActivation=ENABLE; //¼¤»î¹ıÂËÆ÷1	
+	CAN_FilterInit(&CAN_FilterInitStructure);//ÂË²¨Æ÷³õÊ¼»¯	
+	
 #if CAN_RX0_INT_ENABLE
 	
 	CAN_ITConfig(CAN1,CAN_IT_FMP0,ENABLE);//FIFO0ÏûÏ¢¹ÒºÅÖĞ¶ÏÔÊĞí.		    
@@ -123,7 +142,17 @@ void USB_LP_CAN1_RX0_IRQHandler(void)
 		}
 		g_RxMessFlag = 0xAA;
 		//if( g_RxMessFlag == 0xAA )//½ÓÊÕµ½ĞÂÊı¾İ£¬´ÓÉè±¸£¬ÖĞ¶Ï·½Ê½½ÓÊÕ
-		if((Logic_ADD!=0)&&( g_RxMessFlag == 0xAA ))//½ÓÊÕµ½ĞÂÊı¾İ£¬´ÓÉè±¸£¬ÖĞ¶Ï·½Ê½½ÓÊÕ
+		if((Logic_ADD==0)&&( g_RxMessFlag == 0xAA ))//½ÓÊÕµ½ÓĞÊı¾İ
+		{
+			if((g_RxMessage[0]==0xC1)\
+				&&(g_RxMessage[1]==Physical_ADD[0])&&(g_RxMessage[2]==Physical_ADD[1])\
+				&&(g_RxMessage[3]==Physical_ADD[2])&&(g_RxMessage[4]==Physical_ADD[3]))
+			{
+				Logic_ADD = g_RxMessage[5];	//È¡³ö·ÖÅäµÄÂß¼­µØÖ·
+				Package_Send(0xC2,(u8 *)Physical_ADD);
+			}
+		}
+		else if((Logic_ADD!=0)&&( g_RxMessFlag == 0xAA ))//½ÓÊÕµ½ĞÂÊı¾İ£¬´ÓÉè±¸£¬ÖĞ¶Ï·½Ê½½ÓÊÕ
 		{
 			if(g_RxMessage[0] == 0xA4)	//²âÊÔÔÚÏßÉı¼¶
 			{
@@ -153,6 +182,7 @@ void USB_LP_CAN1_RX0_IRQHandler(void)
 			else if((g_RxMessage[1] == Logic_ADD)&&(g_RxMessage[0] == 0x01))	//ÂÖÑ­·½Ê½ÎÊÊı¾İ
 			{
 				gErrorDat[0] = 0x00;	gErrorDat[1] = 0x00;	gErrorDat[2] = 0x00;
+				g_LoseContact = 0;	//Çå.Ê§Áª¼ÆÊıÖµ£»
 				if(g_MemoryBuf[0][0]==0x00)			//ÎŞÊı¾İ°ü
 				{
 					Package_Send(0x02,(u8 *)SendCAN_Buf);
@@ -163,7 +193,7 @@ void USB_LP_CAN1_RX0_IRQHandler(void)
 					SendCAN_Buf[1] = g_MemoryBuf[0][2];	//Êı¾İÓò2 ¿¨ºÅ1
 					SendCAN_Buf[2] = g_MemoryBuf[0][3];	//Êı¾İÓò3 ¿¨ºÅ2
 					SendCAN_Buf[3] = g_MemoryBuf[0][4];	//Êı¾İÓò4 ¿¨ºÅ3
-					Package_Send(0x03,(u8 *)SendCAN_Buf);//Delay(0xFF);
+					Package_Send(0x03,(u8 *)SendCAN_Buf);Delay(0xFF);
 					SendCAN_Buf[0] = g_MemoryBuf[0][5];	//Êı¾İÓò5 ½ğ¶î1
 					SendCAN_Buf[1] = g_MemoryBuf[0][6];	//Êı¾İÓò6 ½ğ¶î2
 					SendCAN_Buf[2] = g_MemoryBuf[0][7];	//Êı¾İÓò6 ½ğ¶î3
@@ -178,7 +208,7 @@ void USB_LP_CAN1_RX0_IRQHandler(void)
 					SendCAN_Buf[1] = g_MemoryBuf[0][2];	//Êı¾İÓò2 ¿¨ºÅ1
 					SendCAN_Buf[2] = g_MemoryBuf[0][3];	//Êı¾İÓò3 ¿¨ºÅ2
 					SendCAN_Buf[3] = g_MemoryBuf[0][4];	//Êı¾İÓò4 ¿¨ºÅ3
-					Package_Send(0x05,(u8 *)SendCAN_Buf);//Delay(0xFF);
+					Package_Send(0x05,(u8 *)SendCAN_Buf);Delay(0xFF);
 					SendCAN_Buf[0] = g_MemoryBuf[0][5];	//Êı¾İÓò5 ½ğ¶î1
 					SendCAN_Buf[1] = g_MemoryBuf[0][6];	//Êı¾İÓò6 ½ğ¶î2
 					SendCAN_Buf[2] = g_MemoryBuf[0][7];	//Êı¾İÓò6 ½ğ¶î3
@@ -254,11 +284,12 @@ u8 Can_Send_Msg(u8* msg,u8 len)
 	u8 mbox;
 	u16 i=0;
 	CanTxMsg TxMessage;
-	if((msg[0]==0xB3)||(msg[0]==0xC2))	
-		TxMessage.StdId=0x200;			// ±ê×¼±êÊ¶·ûÎª0
+	if(msg[0]==0xB3)	
+		TxMessage.StdId=0x100|Physical_ADD[3];			// ±ê×¼±êÊ¶·ûÎª0
+	else if(msg[0]==0xC2)	
+		TxMessage.StdId=0x100|Physical_ADD[3];			// ±ê×¼±êÊ¶·ûÎª0
 	else				
 		TxMessage.StdId=0x200|msg[1];	// ±ê×¼±êÊ¶·ûÎª0
-	//TxMessage.StdId=0x200;			// ±ê×¼±êÊ¶·ûÎª0
 	TxMessage.ExtId=0x1800F001;			// ÉèÖÃÀ©Õ¹±êÊ¾·û£¨29Î»£©
 	TxMessage.IDE=0;			// ²»Ê¹ÓÃÀ©Õ¹±êÊ¶·û
 	TxMessage.RTR=0;		// ÏûÏ¢ÀàĞÍ£ºCAN_RTR_DataÎªÊı¾İÖ¡;CAN_RTR_RemoteÎªÔ¶³ÌÖ¡
