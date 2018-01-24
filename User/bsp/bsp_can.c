@@ -16,9 +16,12 @@ extern uint8_t g_MemoryBuf[5][10];	//Êı¾İ»º´æ£¬[0]=0xAA±íÊ¾ÓĞ²å¿¨Êı¾İ£¬[0]=0xBB±
 extern void PutOutMemoryBuf(void);	//ÇåµÚÒ»¸ö»º´æ
 extern uint8_t re_RxMessage[16];
 extern unsigned char UID[5];
-extern uint8_t gErrorDat[6];	//Òì³£´úÂë´æ´¢
+extern uint8_t gErrorDat[6];		//Òì³£´úÂë´æ´¢
 extern uint8_t Flash_UpdateFlag;	//FlashÓĞÊı¾İ¸üĞÂ±êÖ¾£¬0xAA±íÊ¾ÓĞÊı¾İÒª¸üĞÂ
-extern uint8_t g_IAP_Flag;	//ÔÚÏßÉı¼¶±êÖ¾
+extern uint8_t g_IAP_Flag;			//ÔÚÏßÉı¼¶±êÖ¾
+extern uint8_t g_LoseContact;		//Ê§Áª¼ÆÊı£¬´óÓÚ200Ê±£¬±íÊ¾Ê§Áª£¬×Ô¶¯¸´Î»
+
+extern void Delay (uint16_t nCount);
 
 
 //CAN³õÊ¼»¯
@@ -31,6 +34,7 @@ extern uint8_t g_IAP_Flag;	//ÔÚÏßÉı¼¶±êÖ¾
 //mode:0,ÆÕÍ¨Ä£Ê½;1,»Ø»·Ä£Ê½;
 //Fpclk1µÄÊ±ÖÓÔÚ³õÊ¼»¯µÄÊ±ºòÉèÖÃÎª36M,Èç¹ûÉèÖÃCAN_Normal_Init(1,8,7,5,1);
 //Ôò²¨ÌØÂÊÎª:36M/((1+8+7)*5)=450Kbps
+//Ôò²¨ÌØÂÊÎª:36M/((1+13+2)*18)=125Kbps CAN_Normal_Init(1,13,2,18,1);
 //·µ»ØÖµ:0,³õÊ¼»¯OK;	ÆäËû,³õÊ¼»¯Ê§°Ü;
 
 
@@ -178,6 +182,7 @@ void USB_LP_CAN1_RX0_IRQHandler(void)
 			else if((g_RxMessage[1] == Logic_ADD)&&(g_RxMessage[0] == 0x01))	//ÂÖÑ­·½Ê½ÎÊÊı¾İ
 			{
 				gErrorDat[0] = 0x00;	gErrorDat[1] = 0x00;	gErrorDat[2] = 0x00;
+				g_LoseContact = 0;	//Çå.Ê§Áª¼ÆÊıÖµ£»
 				if(g_MemoryBuf[0][0]==0x00)			//ÎŞÊı¾İ°ü
 				{
 					Package_Send(0x02,(u8 *)SendCAN_Buf);
@@ -188,7 +193,7 @@ void USB_LP_CAN1_RX0_IRQHandler(void)
 					SendCAN_Buf[1] = g_MemoryBuf[0][2];	//Êı¾İÓò2 ¿¨ºÅ1
 					SendCAN_Buf[2] = g_MemoryBuf[0][3];	//Êı¾İÓò3 ¿¨ºÅ2
 					SendCAN_Buf[3] = g_MemoryBuf[0][4];	//Êı¾İÓò4 ¿¨ºÅ3
-					Package_Send(0x03,(u8 *)SendCAN_Buf);//Delay(0xFF);
+					Package_Send(0x03,(u8 *)SendCAN_Buf);Delay(0xFF);
 					SendCAN_Buf[0] = g_MemoryBuf[0][5];	//Êı¾İÓò5 ½ğ¶î1
 					SendCAN_Buf[1] = g_MemoryBuf[0][6];	//Êı¾İÓò6 ½ğ¶î2
 					SendCAN_Buf[2] = g_MemoryBuf[0][7];	//Êı¾İÓò6 ½ğ¶î3
@@ -203,7 +208,7 @@ void USB_LP_CAN1_RX0_IRQHandler(void)
 					SendCAN_Buf[1] = g_MemoryBuf[0][2];	//Êı¾İÓò2 ¿¨ºÅ1
 					SendCAN_Buf[2] = g_MemoryBuf[0][3];	//Êı¾İÓò3 ¿¨ºÅ2
 					SendCAN_Buf[3] = g_MemoryBuf[0][4];	//Êı¾İÓò4 ¿¨ºÅ3
-					Package_Send(0x05,(u8 *)SendCAN_Buf);//Delay(0xFF);
+					Package_Send(0x05,(u8 *)SendCAN_Buf);Delay(0xFF);
 					SendCAN_Buf[0] = g_MemoryBuf[0][5];	//Êı¾İÓò5 ½ğ¶î1
 					SendCAN_Buf[1] = g_MemoryBuf[0][6];	//Êı¾İÓò6 ½ğ¶î2
 					SendCAN_Buf[2] = g_MemoryBuf[0][7];	//Êı¾İÓò6 ½ğ¶î3
