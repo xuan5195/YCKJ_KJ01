@@ -1,3 +1,6 @@
+//更新说明：
+//2018.01.24 增加在未注册时也能够远程复位
+
 #include "bsp.h"
 #include <stdlib.h>  
 #define IAP_Flag	1		//IAP标志 0表示没使用在线升级功能
@@ -173,19 +176,6 @@ int main(void)
 			if(DelayCount==0)
 			{				
 				DelayCount = rand()% 100;  //产生0-99的随机数
-//			else
-//			{
-//				if( (ShowCount%25) == 0 )	//20ms中断，20ms*25=500ms
-//				{
-//					DelayCount--;
-//				}
-//			}
-//			while((DelayCount--)&&(Logic_ADD==0))
-//			{
-//				Delay(0xFFFF);	//简单延时
-//				if(PUSendCount>15)	Delay(0xFFFF);	//简单延时
-//			}
-			//if(PUSendCount<30) printf("Delay(0xFFF);\r\n");
 				if(Logic_ADD==0)
 				{
 					if(PUSendCount<30)	{	Package_Send(0xB3,(u8 *)Physical_ADD);	PUSendCount++;	Delay(0xFF);}	
@@ -216,6 +206,13 @@ int main(void)
 			else if(ShowCount<298)		BspTm1639_Show(0x01,0x00);		//显示方框
 			else						BspTm1639_Show(0x00,0x00);		//关显示			
 		}
+		if(Flash_UpdateFlag == 0xAA)
+		{
+			Write_Flash_Dat();
+			Flash_UpdateFlag = 0;
+			if(g_IAP_Flag == 0xAA)		SoftReset();//更新标志 软件复位
+		}
+		
 	}
 	CAN_DeInit(CAN1);
 	CAN_Mode_Init(CAN_SJW_1tq,CAN_BS1_8tq,CAN_BS2_7tq,18,CAN_Mode_Normal);//CAN初始化正常模式,波特率450Kbps 

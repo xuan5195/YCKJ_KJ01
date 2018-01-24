@@ -151,6 +151,11 @@ void USB_LP_CAN1_RX0_IRQHandler(void)
 				Logic_ADD = g_RxMessage[5];	//取出分配的逻辑地址
 				Package_Send(0xC2,(u8 *)Physical_ADD);
 			}
+			else if(g_RxMessage[0] == 0xA4)	//测试在线升级
+			{
+				g_IAP_Flag = 0xAA;	//清更新标志
+				Flash_UpdateFlag = 0xAA;
+			}
 		}
 		else if((Logic_ADD!=0)&&( g_RxMessFlag == 0xAA ))//接收到新数据，从设备，中断方式接收
 		{
