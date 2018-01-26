@@ -1,5 +1,6 @@
 //更新说明：
 //2018.01.24 增加在未注册时也能够远程复位
+//2018.01.26 增加在未注册时3min自动软复位，提高带电接入卡机时上线成功率
 
 #include "bsp.h"
 #include <stdlib.h>  
@@ -151,7 +152,7 @@ int main(void)
 	InitBoard();			//硬件初始化
 	Delay(0xFFFF); 	//上电简单延时一下  
 	
-	CAN_Mode_Init(CAN_SJW_1tq,CAN_BS1_8tq,CAN_BS2_7tq,18,CAN_Mode_Normal);//CAN初始化正常模式,波特率450Kbps    
+	CAN_Mode_Init(CAN_SJW_1tq,CAN_BS1_13tq,CAN_BS2_2tq,25,CAN_Mode_Normal);//CAN初始化正常模式,波特率90Kbps    
 	printf("\r\nStarting Up...\r\nYCKJ-KJ01 V3.0...\r\n");
 	printf("VersionNo: %02X...\r\n",VERSION);
 	Read_Flash_Dat();	//读取Flash数据
@@ -212,10 +213,10 @@ int main(void)
 			Flash_UpdateFlag = 0;
 			if(g_IAP_Flag == 0xAA)		SoftReset();//更新标志 软件复位
 		}
-		
+		if(g_LoseContact>36)		SoftReset();//失联 软件复位 5*36=18秒=3min，5秒钟累加一；在定时器累加
 	}
 	CAN_DeInit(CAN1);
-	CAN_Mode_Init(CAN_SJW_1tq,CAN_BS1_8tq,CAN_BS2_7tq,18,CAN_Mode_Normal);//CAN初始化正常模式,波特率450Kbps 
+	CAN_Mode_Init(CAN_SJW_1tq,CAN_BS1_13tq,CAN_BS2_2tq,25,CAN_Mode_Normal);//CAN初始化正常模式,波特率90Kbps    
 	ShowCount = 0;g_RxMessFlag = 0x00;	
 	BspTm1639_Show(0x03,WaterCost);	//显示每升水金额值
 	bsp_StartTimer(1, 200);		//定时器1周期 200毫秒

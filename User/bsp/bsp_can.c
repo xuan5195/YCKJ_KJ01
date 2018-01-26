@@ -35,6 +35,7 @@ extern void Delay (uint16_t nCount);
 //Fpclk1的时钟在初始化的时候设置为36M,如果设置CAN_Normal_Init(1,8,7,5,1);
 //则波特率为:36M/((1+8+7)*5)=450Kbps
 //则波特率为:36M/((1+13+2)*18)=125Kbps CAN_Normal_Init(1,13,2,18,1);
+//则波特率为:36M/((1+13+2)*25)= 90Kbps CAN_Normal_Init(1,13,2,25,1);
 //返回值:0,初始化OK;	其他,初始化失败;
 
 
