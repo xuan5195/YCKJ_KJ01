@@ -36,6 +36,7 @@ extern void Delay (uint16_t nCount);
 //则波特率为:36M/((1+8+7)*5)=450Kbps
 //则波特率为:36M/((1+13+2)*18)=125Kbps CAN_Normal_Init(1,13,2,18,1);
 //则波特率为:36M/((1+13+2)*25)= 90Kbps CAN_Normal_Init(1,13,2,25,1);
+//则波特率为:36M/((1+15+4)*36)= 50Kbps CAN_Normal_Init(1,15,4,36,1);
 //返回值:0,初始化OK;	其他,初始化失败;
 
 

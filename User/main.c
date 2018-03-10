@@ -1,6 +1,9 @@
 //更新说明：
-//2018.01.24 增加在未注册时也能够远程复位
-//2018.01.26 增加在未注册时3min自动软复位，提高带电接入卡机时上线成功率
+//2018.01.24  V5.1 增加在未注册时也能够远程复位
+//2018.01.26  V5.1 增加在未注册时3min自动软复位，提高带电接入卡机时上线成功率
+//2018.01.27  V5.1 修复上卡金额为0、错误代码E300时，刷卡造成放水不停止、不计费及显示金额错误等问题。
+//2018.02.03  V5.1 增加在刷卡过程与服务器通信上金额界面闪烁一下。
+//2018.02.23  V5.2 修改CAN波特率为50kbps;失联软复位时间由原来3min改为10Sec。
 
 #include "bsp.h"
 #include <stdlib.h>  
@@ -152,7 +155,12 @@ int main(void)
 	InitBoard();			//硬件初始化
 	Delay(0xFFFF); 	//上电简单延时一下  
 	
-	CAN_Mode_Init(CAN_SJW_1tq,CAN_BS1_13tq,CAN_BS2_2tq,25,CAN_Mode_Normal);//CAN初始化正常模式,波特率90Kbps    
+//	CAN_Mode_Init(CAN_SJW_1tq,CAN_BS1_8tq,CAN_BS2_1tq,90,CAN_Mode_Normal);	//CAN初始化正常模式,波特率40Kbps  //则波特率为:36M/((1+8+1)*90)= 40Kbps CAN_Normal_Init(1,13,1,60,1);   
+//	CAN_Mode_Init(CAN_SJW_2tq,CAN_BS1_16tq,CAN_BS2_2tq,90,CAN_Mode_Normal);	//CAN初始化正常模式,波特率20Kbps  //则波特率为:36M/((2+16+2)*90)= 20Kbps CAN_Normal_Init(2,16,2,90,1);   
+//	CAN_Mode_Init(CAN_SJW_1tq,CAN_BS1_15tq,CAN_BS2_4tq,36,CAN_Mode_Normal);	//CAN初始化正常模式,波特率50Kbps  //则波特率为:36M/((1+15+4)*36)= 50Kbps CAN_Normal_Init(1,15,4,36,1);   
+	CAN_Mode_Init(CAN_SJW_1tq,CAN_BS1_4tq,CAN_BS2_3tq,75,CAN_Mode_Normal);	//CAN初始化正常模式,波特率60Kbps  //则波特率为:36M/((1+2+1)*150)= 60Kbps CAN_Normal_Init(1,2,1,150,1);   
+//	CAN_Mode_Init(CAN_SJW_1tq,CAN_BS1_13tq,CAN_BS2_2tq,25,CAN_Mode_Normal);	//CAN初始化正常模式,波特率90Kbps    
+//	CAN_Mode_Init(CAN_SJW_1tq,CAN_BS1_8tq,CAN_BS2_7tq,18,CAN_Mode_Normal);	//CAN初始化正常模式,波特率125Kbps    
 	printf("\r\nStarting Up...\r\nYCKJ-KJ01 V3.0...\r\n");
 	printf("VersionNo: %02X...\r\n",VERSION);
 	Read_Flash_Dat();	//读取Flash数据
@@ -178,7 +186,7 @@ int main(void)
 			{				
 				DelayCount = rand()% 100;  //产生0-99的随机数
 				if(Logic_ADD==0)
-				{
+ 				{
 					if(PUSendCount<30)	{	Package_Send(0xB3,(u8 *)Physical_ADD);	PUSendCount++;	Delay(0xFF);}	
 					else				{	PUSendCount = 200;	}
 				}
@@ -213,10 +221,16 @@ int main(void)
 			Flash_UpdateFlag = 0;
 			if(g_IAP_Flag == 0xAA)		SoftReset();//更新标志 软件复位
 		}
-		if(g_LoseContact>36)		SoftReset();//失联 软件复位 5*36=18秒=3min，5秒钟累加一；在定时器累加
+		if(g_LoseContact>200)		SoftReset();//失联 软件复位 10秒钟累加一；在定时器累加
 	}
 	CAN_DeInit(CAN1);
-	CAN_Mode_Init(CAN_SJW_1tq,CAN_BS1_13tq,CAN_BS2_2tq,25,CAN_Mode_Normal);//CAN初始化正常模式,波特率90Kbps    
+	
+//	CAN_Mode_Init(CAN_SJW_1tq,CAN_BS1_8tq,CAN_BS2_1tq,90,CAN_Mode_Normal);	//CAN初始化正常模式,波特率40Kbps  //则波特率为:36M/((1+8+1)*90)= 40Kbps CAN_Normal_Init(1,13,1,60,1);   
+//	CAN_Mode_Init(CAN_SJW_2tq,CAN_BS1_16tq,CAN_BS2_2tq,90,CAN_Mode_Normal);	//CAN初始化正常模式,波特率20Kbps  //则波特率为:36M/((2+16+2)*90)= 20Kbps CAN_Normal_Init(2,16,2,90,1);   
+//	CAN_Mode_Init(CAN_SJW_1tq,CAN_BS1_15tq,CAN_BS2_4tq,36,CAN_Mode_Normal);	//CAN初始化正常模式,波特率50Kbps  //则波特率为:36M/((1+15+4)*36)= 50Kbps CAN_Normal_Init(1,15,4,36,1);   
+	CAN_Mode_Init(CAN_SJW_1tq,CAN_BS1_4tq,CAN_BS2_3tq,75,CAN_Mode_Normal);	//CAN初始化正常模式,波特率60Kbps  //则波特率为:36M/((1+2+1)*150)= 60Kbps CAN_Normal_Init(1,2,1,150,1);   
+//	CAN_Mode_Init(CAN_SJW_1tq,CAN_BS1_13tq,CAN_BS2_2tq,25,CAN_Mode_Normal);	//CAN初始化正常模式,波特率90Kbps    
+//	CAN_Mode_Init(CAN_SJW_1tq,CAN_BS1_8tq,CAN_BS2_7tq,18,CAN_Mode_Normal);//CAN初始化正常模式,波特率125Kbps    
 	ShowCount = 0;g_RxMessFlag = 0x00;	
 	BspTm1639_Show(0x03,WaterCost);	//显示每升水金额值
 	bsp_StartTimer(1, 200);		//定时器1周期 200毫秒
@@ -414,6 +428,11 @@ int main(void)
 						if(OvertimeMinutes == 0xAA)	OutPut_OFF();	//关闭水阀，停止放水
 						else						OutPut_ON();	//打开水阀，放水
 					}
+					else if((RFID_Money&0x00FFFFFF)<WaterCost)
+					{
+						OutPut_OFF();	//关闭水阀，停止放水
+					}
+					
 					if(RFID_Count<100)	RFID_Count++;	//100*200=10,000ms
 					
 					if((re_RxMessage[0]!=0)&&(re_RxMessage[4]==re_RxMessage[9])&&(re_RxMessage[10]==CRC8_Table(re_RxMessage,10)))	//CRC校验
@@ -423,7 +442,7 @@ int main(void)
 						   (re_RxMessage[4] == FlagBit))
 						{
 							u32TempDat = (((u32)re_RxMessage[5]<<16)|((u32)re_RxMessage[6]<<8)|re_RxMessage[7]);	//读取云端发回数据
-							if((u32TempDat<=WaterCost)||(Beforeupdate>=u32TempDat))	u32TempDat = 0x00;	//金额为0，直接写入0；
+							if((u32TempDat<=WaterCost)||(Beforeupdate>=u32TempDat))	{u32TempDat = 0x00;	RFID_Count=0;}//金额为0，直接写入0；
 							else													u32TempDat = u32TempDat-Beforeupdate;
 							u32TempDat = u32TempDat | ((u32)re_RxMessage[8]<<24);
 							u32TempDat = u32TempDat;
@@ -435,7 +454,10 @@ int main(void)
 								RFID_MoneyTemp = ReadMoney(FM1702_Key[6]);	//读取卡内金额 使用地址块FM1702_Key[6]
 								if(RFID_MoneyTemp != ErrorMoney)	RFID_Money = RFID_MoneyTemp;	//读卡正确
 								else	{ RFID_Money = OldRFID_Money;OldRFID_Money = RFID_Money;}	//暂存卡内金额
-								BspTm1639_Show(0x04,RFID_Money);	//计费扣款模式	
+								if(RFID_Money<WaterCost)	RFID_Count=0;	//返回金额小于最小扣款金额
+								BspTm1639_Show(0x00,0x00);		Delay(0x2FFF); 	//关显示，延时闪烁一下
+								BspTm1639_Show(0x04,RFID_Money);		//计费扣款模式	
+								OldRFID_Money = RFID_Money;
 							}
 						}
 						for(i=0;i<16;i++)	re_RxMessage[i] = 0x00;
@@ -490,7 +512,7 @@ int main(void)
 				Flash_UpdateFlag = 0;
 				if(g_IAP_Flag == 0xAA)		SoftReset();//更新标志 软件复位
 			}
-			if(g_LoseContact>36)		SoftReset();//失联 软件复位 5*36=18秒=3min，5秒钟累加一；在定时器累加
+			if(g_LoseContact>200)		SoftReset();//失联 软件复位 10秒钟累加一；在定时器累加
 		}
 
 	}
@@ -547,11 +569,11 @@ void TIM3_IRQHandler(void)   //TIM3中断
 			if(OvertimeMinutes<10)	OvertimeMinutes++;	//超时10分钟
 			else				  	OvertimeMinutes = 0xAA;//超时标志
 		}
-		if(Time20msCount<250)	Time20msCount++;	//5秒 250 *20ms = 5000ms
+		if(Time20msCount<10)	Time20msCount++;	//0.2秒 10 *20ms = 200ms
 		else	
 		{	
 			Time20msCount=0;
-			if(g_LoseContact<255)	g_LoseContact++;	//失联计数，5秒加一；
+			if(g_LoseContact<150)	g_LoseContact++;	//失联计数，0.2秒*150 = 30Sec；
 			else					g_LoseContact=255;
 		}
 		TIM_ClearITPendingBit(TIM3, TIM_IT_Update  );  //清除TIMx更新中断标志 					
