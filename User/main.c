@@ -3,7 +3,8 @@
 //2018.01.26  V5.1 增加在未注册时3min自动软复位，提高带电接入卡机时上线成功率
 //2018.01.27  V5.1 修复上卡金额为0、错误代码E300时，刷卡造成放水不停止、不计费及显示金额错误等问题。
 //2018.02.03  V5.1 增加在刷卡过程与服务器通信上金额界面闪烁一下。
-//2018.02.23  V5.2 修改CAN波特率为50kbps;失联软复位时间由原来3min改为10Sec。
+//2018.02.23  V5.2 修改CAN波特率为60kbps;失联软复位时间由原来3min改为15Sec。
+//2018.03.12  V5.3 增加上电主动外发本机SN用于主动注册，发送次数为10次。
 
 #include "bsp.h"
 #include <stdlib.h>  
@@ -142,6 +143,7 @@ int main(void)
 	uint8_t RFID_Count=0;	//卡开启水阀延时时间;3秒
 	uint8_t ErrorTemp[5]={0};
 	uint8_t UseErrFlag = 0x00;	//用户或卡异常标志,接收到服务器返回数据后才显示异常代码值 否则显示‘E000’
+	uint8_t PowerUp_Count=5;
 	uint8_t i=0;
 	uint32_t RFID_Money_Dat=0;	//卡内金额,用于错误时使用
 	uint8_t OldCardInFlag = 0;	//用于标记插卡、拔卡动作
@@ -152,15 +154,10 @@ int main(void)
 		NVIC_SetVectorTable(NVIC_VectTab_FLASH, 0x5000); //设置中断向量表的位置在 0x5000，并且将Target的IROM1起始改为0x08005000.
 	#endif
 	
-	InitBoard();			//硬件初始化
-	Delay(0xFFFF); 	//上电简单延时一下  
+	InitBoard();		//硬件初始化
+	Delay(0xFFFF); 		//上电简单延时一下  
 	
-//	CAN_Mode_Init(CAN_SJW_1tq,CAN_BS1_8tq,CAN_BS2_1tq,90,CAN_Mode_Normal);	//CAN初始化正常模式,波特率40Kbps  //则波特率为:36M/((1+8+1)*90)= 40Kbps CAN_Normal_Init(1,13,1,60,1);   
-//	CAN_Mode_Init(CAN_SJW_2tq,CAN_BS1_16tq,CAN_BS2_2tq,90,CAN_Mode_Normal);	//CAN初始化正常模式,波特率20Kbps  //则波特率为:36M/((2+16+2)*90)= 20Kbps CAN_Normal_Init(2,16,2,90,1);   
-//	CAN_Mode_Init(CAN_SJW_1tq,CAN_BS1_15tq,CAN_BS2_4tq,36,CAN_Mode_Normal);	//CAN初始化正常模式,波特率50Kbps  //则波特率为:36M/((1+15+4)*36)= 50Kbps CAN_Normal_Init(1,15,4,36,1);   
 	CAN_Mode_Init(CAN_SJW_1tq,CAN_BS1_4tq,CAN_BS2_3tq,75,CAN_Mode_Normal);	//CAN初始化正常模式,波特率60Kbps  //则波特率为:36M/((1+2+1)*150)= 60Kbps CAN_Normal_Init(1,2,1,150,1);   
-//	CAN_Mode_Init(CAN_SJW_1tq,CAN_BS1_13tq,CAN_BS2_2tq,25,CAN_Mode_Normal);	//CAN初始化正常模式,波特率90Kbps    
-//	CAN_Mode_Init(CAN_SJW_1tq,CAN_BS1_8tq,CAN_BS2_7tq,18,CAN_Mode_Normal);	//CAN初始化正常模式,波特率125Kbps    
 	printf("\r\nStarting Up...\r\nYCKJ-KJ01 V3.0...\r\n");
 	printf("VersionNo: %02X...\r\n",VERSION);
 	Read_Flash_Dat();	//读取Flash数据
@@ -180,15 +177,24 @@ int main(void)
 	srand((Physical_ADD[2]<<8)|(Physical_ADD[3]));	//使用物理地址后二位作为种子
 	while(Logic_ADD==0)	//逻辑地址为0时，表示该设备未注册，进入等待注册过程
 	{
-		if(PowerUpFlag==0xAA)
+		if((PowerUpFlag==0xAA)||(PowerUp_Count>0))	//收到注册广播 或 上电计数10次
 		{
 			if(DelayCount==0)
 			{				
 				DelayCount = rand()% 100;  //产生0-99的随机数
 				if(Logic_ADD==0)
  				{
-					if(PUSendCount<30)	{	Package_Send(0xB3,(u8 *)Physical_ADD);	PUSendCount++;	Delay(0xFF);}	
-					else				{	PUSendCount = 200;	}
+					if(PowerUp_Count>0)		//上电注册
+					{
+						Package_Send(0xB3,(u8 *)Physical_ADD);	
+						PowerUp_Count--;
+					}
+					else
+					{
+						PowerUp_Count = 0;
+						if(PUSendCount<30)	{	Package_Send(0xB3,(u8 *)Physical_ADD);	PUSendCount++;	Delay(0xFF);}	
+						else				{	PUSendCount = 200;	}
+					}
 				}
 			}				
 		}
@@ -196,13 +202,6 @@ int main(void)
 		if( g_RxMessFlag == 0xAA )//接收到有数据
 		{
 			if((g_RxMessage[0]==0xA1)&&(g_RxMessage[1]==0xA1))	{	PowerUpFlag=0xAA;	}//进入随机延时未注册回复
-//			else if((g_RxMessage[0]==0xC1)\
-//				&&(g_RxMessage[1]==Physical_ADD[0])&&(g_RxMessage[2]==Physical_ADD[1])\
-//				&&(g_RxMessage[3]==Physical_ADD[2])&&(g_RxMessage[4]==Physical_ADD[3]))
-//			{
-//				Logic_ADD = g_RxMessage[5];	//取出分配的逻辑地址
-//				Package_Send(0xC2,(u8 *)Physical_ADD);
-//			}
 			g_RxMessFlag = 0x00;
 		}
 		
@@ -225,15 +224,10 @@ int main(void)
 	}
 	CAN_DeInit(CAN1);
 	
-//	CAN_Mode_Init(CAN_SJW_1tq,CAN_BS1_8tq,CAN_BS2_1tq,90,CAN_Mode_Normal);	//CAN初始化正常模式,波特率40Kbps  //则波特率为:36M/((1+8+1)*90)= 40Kbps CAN_Normal_Init(1,13,1,60,1);   
-//	CAN_Mode_Init(CAN_SJW_2tq,CAN_BS1_16tq,CAN_BS2_2tq,90,CAN_Mode_Normal);	//CAN初始化正常模式,波特率20Kbps  //则波特率为:36M/((2+16+2)*90)= 20Kbps CAN_Normal_Init(2,16,2,90,1);   
-//	CAN_Mode_Init(CAN_SJW_1tq,CAN_BS1_15tq,CAN_BS2_4tq,36,CAN_Mode_Normal);	//CAN初始化正常模式,波特率50Kbps  //则波特率为:36M/((1+15+4)*36)= 50Kbps CAN_Normal_Init(1,15,4,36,1);   
 	CAN_Mode_Init(CAN_SJW_1tq,CAN_BS1_4tq,CAN_BS2_3tq,75,CAN_Mode_Normal);	//CAN初始化正常模式,波特率60Kbps  //则波特率为:36M/((1+2+1)*150)= 60Kbps CAN_Normal_Init(1,2,1,150,1);   
-//	CAN_Mode_Init(CAN_SJW_1tq,CAN_BS1_13tq,CAN_BS2_2tq,25,CAN_Mode_Normal);	//CAN初始化正常模式,波特率90Kbps    
-//	CAN_Mode_Init(CAN_SJW_1tq,CAN_BS1_8tq,CAN_BS2_7tq,18,CAN_Mode_Normal);//CAN初始化正常模式,波特率125Kbps    
 	ShowCount = 0;g_RxMessFlag = 0x00;	
 	BspTm1639_Show(0x03,WaterCost);	//显示每升水金额值
-	bsp_StartTimer(1, 200);		//定时器1周期 200毫秒
+	bsp_StartTimer(1, 200);			//定时器1周期 200毫秒
 	while (1)
 	{
 		CPU_IDLE();
@@ -569,11 +563,11 @@ void TIM3_IRQHandler(void)   //TIM3中断
 			if(OvertimeMinutes<10)	OvertimeMinutes++;	//超时10分钟
 			else				  	OvertimeMinutes = 0xAA;//超时标志
 		}
-		if(Time20msCount<10)	Time20msCount++;	//0.2秒 10 *20ms = 200ms
+		if(Time20msCount<10)	Time20msCount++;		//0.2秒 10 *20ms = 200ms
 		else	
 		{	
 			Time20msCount=0;
-			if(g_LoseContact<150)	g_LoseContact++;	//失联计数，0.2秒*150 = 30Sec；
+			if(g_LoseContact<100)	g_LoseContact++;	//失联计数，0.2秒*100 = 20Sec；
 			else					g_LoseContact=255;
 		}
 		TIM_ClearITPendingBit(TIM3, TIM_IT_Update  );  //清除TIMx更新中断标志 					

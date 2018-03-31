@@ -30,7 +30,7 @@
 	#define FALSE 0
 #endif
 
-#define VERSION		    0x52		//固件版本号
+#define VERSION		    0x53		//固件版本号
 
 
 #include "bsp_timer.h"		
